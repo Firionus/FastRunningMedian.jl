@@ -2,7 +2,7 @@ module FastRunningMedian
 
 using DataStructures
 
-export runningmedian
+export runningmedian, MedianFilter, grow!, median, length, shrink!, roll!
 
 # Custom Orderings for DataStructures.MutableBinaryHeap
 struct TupleForward <: Base.Ordering end
@@ -10,6 +10,8 @@ Base.lt(o::TupleForward, a, b) = a[1] < b[1]
 
 struct TupleReverse <: Base.Ordering end
 Base.lt(o::TupleReverse, a, b) = a[1] > b[1]
+
+# TODO constructor and grow! with multiple values
 
 mutable struct MedianFilter 
     low_heap::MutableBinaryHeap{Tuple{Float64, Int64}, TupleReverse} 
@@ -26,7 +28,7 @@ mutable struct MedianFilter
     # However the indices in the heaps might go out of date whenever overwriting elements at the beginning of the circular buffer
     # This is why index_in_heap_pos = heap_pos_indices_in_heaps - heap_pos_offset
 end
-# TODO generic typing instead of Float64
+# TODO generic typing (Real?) instead of Float64
 
 # Constructor
 function MedianFilter(first_val::Float64, max_window_size::Int64)
@@ -41,69 +43,126 @@ function MedianFilter(first_val::Float64, max_window_size::Int64)
     MedianFilter(low_heap, high_heap, heap_positions, 0)
 end
 
-#Base.first(h::MutableBinaryHeap) = h.nodes[1].value
-# This should be exported by DataStructures, but somehow isn't...
-# TODO Check why this isn't exported by DataStructures
+"""
+    median(mf::MedianFilter)
 
+Determine the current median in mf. 
+
+If the number of elements in MedianFilter is odd, the low_heap shall always be one element bigger than
+the high_heap. The top element of the low_heap then is the median. 
+
+If the number of elements in MedianFilter is even, both heaps are the same size and the
+median is the mean of both top elements. 
+"""
 function median(mf::MedianFilter)
-    # The low_heap is always kept one element bigger than the high_heap
-    # The top element of the low_heap then is the current median
-    first(mf.low_heap)[1]
-end
-
-# TODO replace all usages of this function with smarter usage of push!, update!, remove!, pop!, etc. 
-# where we already know what values to push over to the other heap
-function equalize_heap_size!(mf, flag)
-    if flag == 1
-        #all good
-    elseif flag == 3
-        # low_heap too big
-        # move highest value in low_heap up to high_heap
-        popped_val = pop!(mf.low_heap)
-        pushed_to = push!(mf.high_heap, popped_val)
-        mf.heap_pos[popped_val[2]-mf.heap_pos_offset] = (false, pushed_to)
-    elseif flag == -1
-        # high_heap too big
-        # move lowest value of high_heap down
-        popped_val = pop!(mf.high_heap)
-        pushed_to = push!(mf.low_heap, popped_val)
-        mf.heap_pos[popped_val[2]-mf.heap_pos_offset] = (true, pushed_to)
+    if length(mf.low_heap) == length(mf.high_heap)
+        # even number of elements
+        # median is mean of both top elements
+        return (first(mf.low_heap)[1]+first(mf.high_heap)[1])/2
     else
-        errors("flag does not have a valid value")
+        # odd number of elements
+        return first(mf.low_heap)[1]
     end
 end
 
-# grow by 2, these are assumed to correlate to the next two values from data and are just pushed onto heap_positions
-function growby2!(mf::MedianFilter, vals) 
-    
-    #must not grow beyond max_window_size!!!!!! Otherwise not valid!!!!
-    if length(mf.heap_pos)+2 > capacity(mf.heap_pos)
-        #println("current ring buffer length is ", length(mf.heap_pos))
-        #println("current ring buffer capacity is ", capacity(mf.heap_pos))
-        error("groby2! would grow beyond ring buffer capacity and result in invalid state")
+Base.length(mf::MedianFilter) = mf.heap_pos|>length
+
+"""
+    grow!(mf::MedianFilter, val)
+
+Grow mf with the new element val. 
+
+Returns the updated median. If mf would grow beyond
+maximum window size, an error is thrown. In this case you probably wanted to use roll!. 
+
+The new element is pushed onto the end of the circular buffer. 
+"""
+function grow!(mf::MedianFilter, val)
+    # check that we don't grow beyond circular buffer capacity
+    if length(mf.heap_pos)+1 > capacity(mf.heap_pos)
+        println("current ring buffer length is ", length(mf.heap_pos))
+        println("current ring buffer capacity is ", capacity(mf.heap_pos))
+        error("grow! would grow circular buffer length by 1 and therefore exceed circular buffer capacity")
     end
-    
-    
-    flag = 1 # how much bigger low_heap is in comparison to high_heap
-    for k in 1:2 #both vals
-        if vals[k] > first(mf.low_heap)[1]
-            #push onto high_heap
-            pushed_ind = push!(mf.high_heap, (vals[k], 0))
-            push!(mf.heap_pos, (false, pushed_ind))
-            update!(mf.high_heap, pushed_ind, (vals[k], length(mf.heap_pos)+mf.heap_pos_offset))
-            flag -= 1
-        else 
-            #push onto low_heap
-            pushed_ind = push!(mf.low_heap, (vals[k], 0))
-            push!(mf.heap_pos, (true, pushed_ind))
-            update!(mf.low_heap, pushed_ind, (vals[k], length(mf.heap_pos)+mf.heap_pos_offset))
-            flag += 1
+
+    if length(mf.low_heap) == length(mf.high_heap)
+        # even number of elements
+        # low_heap needs to grow
+        middle_high = first(mf.high_heap)
+        if val <= middle_high[1]
+            # just push! new value onto low_heap
+            _push_onto_heap!(mf, val, onto_low_heap=true)
+        else
+            # replace middle_high in high_heap with new val and move middle_high to low_heap
+            _push_displace!(mf, val, middle_high, onto_low_heap=false)
+        end
+    else
+        # odd number of elements
+        # high_heap needs to grow
+        current_median = first(mf.low_heap)
+        if val >= current_median[1]
+            # just push! new value onto high_heap
+            _push_onto_heap!(mf, val, onto_low_heap=false)
+        else
+            # replace current_median in low_heap with new val and move current_median to high_heap
+            _push_displace!(mf, val, current_median, onto_low_heap=true)
         end
     end
-    
-    equalize_heap_size!(mf, flag)
-    
+
     return median(mf)
+end
+
+"just push a new value onto one of the heaps and update heap_pos accordingly"
+function _push_onto_heap!(mf::MedianFilter, val; onto_low_heap::Bool)
+    if onto_low_heap == true
+        pushed_handle = push!(mf.low_heap, (val, 0))
+        push!(mf.heap_pos, (true, pushed_handle))
+        mf.low_heap[pushed_handle] = (val, length(mf.heap_pos)+mf.heap_pos_offset)
+    else
+        pushed_handle = push!(mf.high_heap, (val, 0))
+        push!(mf.heap_pos, (false, pushed_handle))
+        mf.high_heap[pushed_handle] = (val, length(mf.heap_pos)+mf.heap_pos_offset)
+    end
+end
+
+"push new val onto heap while displacing to_displace to the other heap"
+function _push_displace!(mf::MedianFilter, val, to_displace; onto_low_heap::Bool)
+    if onto_low_heap == true
+        # push new val to end of circular buffer and onto low_heap where it replaces to_displace
+        push!(mf.heap_pos, (true, to_displace[2]))
+        update!(mf.low_heap, mf.heap_pos[to_displace[2]-mf.heap_pos_offset][2], 
+            (val, length(mf.heap_pos)+mf.heap_pos_offset))
+        # move to_displace onto high_heap
+        pushed_handle = push!(mf.high_heap, to_displace)
+        #update heap_pos
+        mf.heap_pos[to_displace[2]-mf.heap_pos_offset] = (false, pushed_handle)
+    else
+        # push new val to end of circular buffer an onto high_heap where it replaces to_displace
+        push!(mf.heap_pos, (false, to_displace[2]))
+        update!(mf.high_heap, mf.heap_pos[to_displace[2]-mf.heap_pos_offset][2], 
+            (val, length(mf.heap_pos)+mf.heap_pos_offset))
+        # move to_displace onto low_heap
+        pushed_handle = push!(mf.low_heap, to_displace)
+        # update heap_pos
+        mf.heap_pos[to_displace[2]-mf.heap_pos_offset] = (true, pushed_handle)
+    end
+end
+
+"""
+    shrink!(mf::MedianFilter)
+
+Shrinks mf by removing the first and oldest element in the circular buffer. 
+
+Returns the updated median. Will error if mf contains only one element as a MedianFilter with zero elements
+would not have a median. 
+"""
+function shrink!(mf::MedianFilter)
+    if length(mf.heap_pos) <= 1
+        error("MedianFilter of length 1 cannot be shrunk further because it would not have a median anymore")
+    end
+
+    # TODO write something here and update everything below
+
 end
 
 function shrinkby2!(mf::MedianFilter)
@@ -213,6 +272,9 @@ function roll!(mf::MedianFilter, val::Float64)
     return median(mf)
 end
 
+
+# TODO remove restrictions on input and window size where reasonably well defined behaviour can be accomplished
+# TODO add asymmetric tapering of window towards end
 """
     runningmedian(input::Array{Float64, 1}, max_window_size=53)
 
