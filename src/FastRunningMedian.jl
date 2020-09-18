@@ -274,6 +274,7 @@ function runningmedian(input::Array{Float64, 1}, max_window_size=53)
         #println(mymf)
 
         # sanity check
+        #=
         for k in 1:length(mymf.heap_pos)
             current_heap, current_heap_ind = mymf.heap_pos[k]
             if current_heap == true
@@ -286,6 +287,7 @@ function runningmedian(input::Array{Float64, 1}, max_window_size=53)
                 @assert k == a
             end
         end
+        =#
     end
     output
 end
