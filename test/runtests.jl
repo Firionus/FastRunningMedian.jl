@@ -1,16 +1,47 @@
 using FastRunningMedian, Test
+import FastRunningMedian.check_health
 import Statistics
 
 @testset "FastRunningMedian Tests" begin
 
-@testset "simple examples" begin
-    @test runningmedian([1., 2., 1., 2., 1., 3.]) == [1., 1., 1., 2., 2., 3.]
-    @test runningmedian([1., 1., 2., 1., 1., 1., 1., 1., 2., 1.]) == 
-                        [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
+    @testset "Stateful API Tests" begin
+
+        @testset "Grow and Shrink" begin
+            for j in 1:50
+                N = rand(1:200)
+                x = rand(N)
+                mf = MedianFilter(x[1], N)
+                check_health(mf)
+                # grow phase
+                for i in 2:length(x)
+                    grow!(mf, x[i])
+                    check_health(mf)
+                    @assert Statistics.median(x[1:i]) == median(mf)
+                end
+                # shrink phase
+                for i in 2:length(x)
+                    shrink!(mf)
+                    check_health(mf)
+                    @assert Statistics.median(x[i:end]) == median(mf)
+                end
+            end
+        end
+
+        
+
+    end
+
 end
-
-
 #=
+
+    @testset "simple examples" begin
+        @test runningmedian([1., 2., 1., 2., 1., 3.]) == [1., 1., 1., 2., 2., 3.]
+        @test runningmedian([1., 1., 2., 1., 1., 1., 1., 1., 2., 1.]) == 
+                        [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
+    end
+
+
+#= 
 import FastRunningMedian.MedianFilter, FastRunningMedian.growby2!, FastRunningMedian.shrinkby2!, FastRunningMedian.roll!, FastRunningMedian.median
 
 function runningmedian_with_sanity_check(input::Array{Float64, 1}, max_window_size=53)
@@ -61,102 +92,103 @@ function runningmedian_with_sanity_check(input::Array{Float64, 1}, max_window_si
         end
     end
     output
-end
-=#
+end =#
 
-function naivemedianfilter(arr, window=53)
-    flag = [false, false]
-    if arr[1]|>ismissing
-        arr = arr[2:end]
-        flag[1] = true
-    end
-    if arr[end]|>ismissing
-        arr = arr[1:end-1]
-        flag[2] = true
-    end
+    function naivemedianfilter(arr, window=53)
+        flag = [false, false]
+        if arr[1] |> ismissing
+            arr = arr[2:end]
+            flag[1] = true
+        end
+        if arr[end] |> ismissing
+            arr = arr[1:end - 1]
+            flag[2] = true
+        end
     
-    output = similar(arr)
-    offset = round(window/2, Base.Rounding.RoundNearestTiesAway)|>Int
-    for j in eachindex(arr)
-        temp_offset = min(offset, j-1, length(arr)-j)
+        output = similar(arr)
+        offset = round(window / 2, Base.Rounding.RoundNearestTiesAway) |> Int
+        for j in eachindex(arr)
+            temp_offset = min(offset, j - 1, length(arr) - j)
         
-        beginning = j-temp_offset
-        ending = j+temp_offset
-        to_median = arr[beginning:ending]|>skipmissing
-        if to_median|>isempty
-            output[j] = missing
-        else
-            output[j] = Statistics.median(to_median)
+            beginning = j - temp_offset
+            ending = j + temp_offset
+            to_median = arr[beginning:ending] |> skipmissing
+            if to_median |> isempty
+                output[j] = missing
+            else
+                output[j] = Statistics.median(to_median)
+            end
+        end
+        if flag[1] == true
+            output = [missing; output]
+        end
+        if flag[2] == true
+            output = [output; missing]
+        end
+        output
+    end
+
+    function compare_to_naive(N, w)
+        x = rand(N)
+        y = runningmedian(x, w)
+        y2 = naivemedianfilter(x, w - 1)
+        @test y == y2
+    end
+
+    @testset "compare to naive filter" begin
+        println("running tests...")
+
+        @testset "long input to test roll!" begin
+            compare_to_naive(1_000_000, 101)
+        end
+
+        @testset "short input, long window" begin
+            for i = 1:200
+                N = rand(3:20)
+                w = rand(19:2:100)
+                compare_to_naive(N, w)
+            end
+        end
+
+        @testset "short windows" begin
+            for i = 1:200
+                N = rand(10:1_000)
+                w = rand(3:2:11)
+                compare_to_naive(N, w)
+            end
+        end
+
+        @testset "intermediate stuff" begin
+            for i = 1:200
+                compare_to_naive(rand(100:10_000), rand(11:2:1_000))
+            end
+        end
+
+        @testset "even length windows not allowed" begin
+            for i in 1:100
+                w = rand(0:2:1_000_000)  
+                x = rand(100)
+                @test_throws ErrorException runningmedian(x, w)
+            end
+        end
+
+        @testset "window of lenght 1 not allowed" begin
+            for i in 1:10
+                w = 1
+                x = rand(rand(1:1_000))
+                @test_throws ErrorException runningmedian(x, w)
+            end
+        end
+
+        @testset "input of lenght 1 or 2 not allowed" begin
+            for i in 1:10
+                w = rand(3:2:15)
+                input = rand(rand(1:2))
+                @test_throws ErrorException runningmedian(input, w)
+            end
         end
     end
-    if flag[1] == true
-        output = [missing; output]
-    end
-    if flag[2] == true
-        output = [output; missing]
-    end
-    output
-end
 
-function compare_to_naive(N, w)
-    x = rand(N)
-    y = runningmedian(x, w)
-    y2 = naivemedianfilter(x, w-1)
-    @test y == y2
-end
+end # all tests    
 
-@testset "compare to naive filter" begin
-    println("running tests...")
-
-    @testset "long input to test roll!" begin
-        compare_to_naive(1_000_000, 101)
-    end
-
-    @testset "short input, long window" begin
-        for i = 1:200
-            N = rand(3:20)
-            w = rand(19:2:100)
-            compare_to_naive(N, w)
-        end
-    end
-
-    @testset "short windows" begin
-        for i = 1:200
-            N = rand(10:1_000)
-            w = rand(3:2:11)
-            compare_to_naive(N, w)
-        end
-    end
-
-    @testset "intermediate stuff" begin
-        for i = 1:200
-            compare_to_naive(rand(100:10_000), rand(11:2:1_000))
-        end
-    end
-
-    @testset "even length windows not allowed" begin
-        for i in 1:100
-            w = rand(0:2:1_000_000)  
-            x = rand(100)
-            @test_throws ErrorException runningmedian(x, w)
-        end
-    end
-
-    @testset "window of lenght 1 not allowed" begin
-        for i in 1:10
-            w = 1
-            x = rand(rand(1:1_000))
-            @test_throws ErrorException runningmedian(x, w)
-        end
-    end
-
-    @testset "input of lenght 1 or 2 not allowed" begin
-        for i in 1:10
-            w = rand(3:2:15)
-            input = rand(rand(1:2))
-            @test_throws ErrorException runningmedian(input, w)
-        end
-    end
-end
-
-end #all tests
+=#

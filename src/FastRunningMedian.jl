@@ -94,7 +94,15 @@ function grow!(mf::MedianFilter, val)
             _push_onto_heap!(mf, val, onto_low_heap=true)
         else
             # replace middle_high in high_heap with new val and move middle_high to low_heap
-            _push_displace!(mf, val, middle_high, onto_low_heap=false)
+
+            # push new val to end of circular buffer an onto high_heap where it replaces to_displace
+            push!(mf.heap_pos, mf.heap_pos[middle_high[2]])
+            update!(mf.high_heap, mf.heap_pos[middle_high[2]-mf.heap_pos_offset][2], 
+                (val, length(mf.heap_pos)+mf.heap_pos_offset))
+            # move middle_high onto low_heap
+            pushed_handle = push!(mf.low_heap, middle_high)
+            # update heap_pos
+            mf.heap_pos[middle_high[2]-mf.heap_pos_offset] = (true, pushed_handle)
         end
     else
         # odd number of elements
@@ -105,7 +113,15 @@ function grow!(mf::MedianFilter, val)
             _push_onto_heap!(mf, val, onto_low_heap=false)
         else
             # replace current_median in low_heap with new val and move current_median to high_heap
-            _push_displace!(mf, val, current_median, onto_low_heap=true)
+
+            # push new val to end of circular buffer and onto low_heap where it replaces current_median
+            push!(mf.heap_pos, mf.heap_pos[current_median[2]])
+            update!(mf.low_heap, mf.heap_pos[current_median[2]-mf.heap_pos_offset][2], 
+                (val, length(mf.heap_pos)+mf.heap_pos_offset))
+            # move current_median onto high_heap
+            pushed_handle = push!(mf.high_heap, current_median)
+            #update heap_pos
+            mf.heap_pos[current_median[2]-mf.heap_pos_offset] = (false, pushed_handle)
         end
     end
 
@@ -125,28 +141,7 @@ function _push_onto_heap!(mf::MedianFilter, val; onto_low_heap::Bool)
     end
 end
 
-"push new val onto heap while displacing to_displace to the other heap"
-function _push_displace!(mf::MedianFilter, val, to_displace; onto_low_heap::Bool)
-    if onto_low_heap == true
-        # push new val to end of circular buffer and onto low_heap where it replaces to_displace
-        push!(mf.heap_pos, (true, to_displace[2]))
-        update!(mf.low_heap, mf.heap_pos[to_displace[2]-mf.heap_pos_offset][2], 
-            (val, length(mf.heap_pos)+mf.heap_pos_offset))
-        # move to_displace onto high_heap
-        pushed_handle = push!(mf.high_heap, to_displace)
-        #update heap_pos
-        mf.heap_pos[to_displace[2]-mf.heap_pos_offset] = (false, pushed_handle)
-    else
-        # push new val to end of circular buffer an onto high_heap where it replaces to_displace
-        push!(mf.heap_pos, (false, to_displace[2]))
-        update!(mf.high_heap, mf.heap_pos[to_displace[2]-mf.heap_pos_offset][2], 
-            (val, length(mf.heap_pos)+mf.heap_pos_offset))
-        # move to_displace onto low_heap
-        pushed_handle = push!(mf.low_heap, to_displace)
-        # update heap_pos
-        mf.heap_pos[to_displace[2]-mf.heap_pos_offset] = (true, pushed_handle)
-    end
-end
+
 
 """
     shrink!(mf::MedianFilter)
@@ -161,51 +156,35 @@ function shrink!(mf::MedianFilter)
         error("MedianFilter of length 1 cannot be shrunk further because it would not have a median anymore")
     end
 
-    # TODO write something here and update everything below
+    to_remove = popfirst!(mf.heap_pos)
+    mf.heap_pos_offset += 1
 
-end
-
-function shrinkby2!(mf::MedianFilter)
-    #println("entering shrinkby2! with ", mf)
-
-    # remove the two values at the start of the circular buffer while shrinking it and the heap
-    flag = 1 # how much bigger low_heap is in comparison to high_heap
-    for k in 1:2
-        to_remove = popfirst!(mf.heap_pos)
-        #println("trying to remove ", to_remove)
-        mf.heap_pos_offset += 1
+    if length(mf.low_heap) == length(mf.high_heap)
+        # even number of elements
+        # high_heap needs to get smaller
         if to_remove[1] == true
-            # element to remove is in low_heap
-            delete!(mf.low_heap, to_remove[2])
-            flag -= 1
+            # element-to-remove is in low_heap
+            medium_high = pop!(mf.high_heap)
+            update!(mf.low_heap, to_remove[2], medium_high)
+            mf.heap_pos[medium_high[2]-mf.heap_pos_offset] = to_remove
         else
-            # element to remove is in high_heap
+            # element-to-remove is in high_heap
             delete!(mf.high_heap, to_remove[2])
-            flag += 1
         end
-    #println("after removing (another) one we have ", mf)
-
-    # sanity check
-    for k in 1:length(mf.heap_pos)
-        current_heap, current_heap_ind = mf.heap_pos[k]
-        if current_heap == true
-            a = mf.low_heap[current_heap_ind][2] - mf.heap_pos_offset
-            #println(k, " ?= ", a)
-            @assert k == a
+    else
+        # odd number of elements
+        # low_heap needs to get smaller
+        if to_remove[1] == true
+            # element-to-remove is in low_heap
+            delete!(mf.low_heap, to_remove[2])
         else
-            a = mf.high_heap[current_heap_ind][2] - mf.heap_pos_offset
-            #println(k, " ?= ", a)
-            @assert k == a
+            # element-to-remove is in high_heap
+            current_median = pop!(mf.low_heap)
+            update!(mf.high_heap, to_remove[2], current_median)
+            mf.heap_pos[current_median[2]-mf.heap_pos_offset] = to_remove
         end
     end
 
-    #println("which passed its health check")
-
-    end
-
-    equalize_heap_size!(mf, flag)
-
-    #println("after equalizing we have ", mf)
     return median(mf)
 end
 
@@ -272,6 +251,11 @@ function roll!(mf::MedianFilter, val::Float64)
     return median(mf)
 end
 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# CONTINUE HERE
+# TODO rewrite runningmedian
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 # TODO remove restrictions on input and window size where reasonably well defined behaviour can be accomplished
 # TODO add asymmetric tapering of window towards end
@@ -334,22 +318,26 @@ function runningmedian(input::Array{Float64, 1}, max_window_size=53)
         end
         prev_offset = current_offset
         #println(mymf)
-
-        # sanity check
-        for k in 1:length(mymf.heap_pos)
-            current_heap, current_heap_ind = mymf.heap_pos[k]
-            if current_heap == true
-                a = mymf.low_heap[current_heap_ind][2] - mymf.heap_pos_offset
-                #println(k, " ?= ", a)
-                @assert k == a
-            else
-                a = mymf.high_heap[current_heap_ind][2] - mymf.heap_pos_offset
-                #println(k, " ?= ", a)
-                @assert k == a
-            end
-        end
+        # DEBUG STATEMENT ONLY REMOVE IN PRODUCTION
+        check_health(mymf)
     end
     output
+end
+
+function check_health(mymf::MedianFilter)
+    # sanity check
+    for k in 1:length(mymf.heap_pos)
+        current_heap, current_heap_ind = mymf.heap_pos[k]
+        if current_heap == true
+            a = mymf.low_heap[current_heap_ind][2] - mymf.heap_pos_offset
+            #println(k, " ?= ", a)
+            @assert k == a
+        else
+            a = mymf.high_heap[current_heap_ind][2] - mymf.heap_pos_offset
+            #println(k, " ?= ", a)
+            @assert k == a
+        end
+    end
 end
 
 end # module
