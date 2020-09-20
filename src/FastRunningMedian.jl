@@ -13,29 +13,37 @@ Base.lt(o::TupleReverse, a, b) = a[1] > b[1]
 
 # TODO constructor and grow! with multiple values (sort should be faster than a lot of growing, right? Gotta push! onto heap in the right order to avoid bubbling though. )
 
-mutable struct MedianFilter 
-    low_heap::MutableBinaryHeap{Tuple{Float64,Int64},TupleReverse} 
-    high_heap::MutableBinaryHeap{Tuple{Float64,Int64},TupleForward}
+mutable struct MedianFilter{T}
+    low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse} 
+    high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward}
     # first tuple value is data, second tuple value is index in heap_pos (see heap_pos_offset!)
 
     # ordered like data in moving window would be
     # first tuple value true if in low_heap, false if in high_heap
     # second value is handle in corresponding heap
-    heap_pos::CircularBuffer{Tuple{Bool,Int64}}
+    heap_pos::CircularBuffer{Tuple{Bool,Int}}
 
-    heap_pos_offset::Int64 
+    heap_pos_offset::Int
     # heap_pos is indexed with the first element at index 1. 
     # However the indices in the heaps might go out of date whenever overwriting elements at the beginning of the circular buffer
     # This is why index_in_heap_pos = heap_pos_indices_in_heaps - heap_pos_offset
+
+    # Inner constructor to enforce T <: Real
+    function MedianFilter(low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse}, 
+        high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward}, 
+        heap_pos::CircularBuffer{Tuple{Bool,Int}}, 
+        heap_pos_offset::Int) where T <: Real
+        return new{T}(low_heap, high_heap, heap_pos, heap_pos_offset)
+    end
 end
 # TODO generic typing (Real?) instead of Float64
 
 # Constructor
 # TODO Documentation (here and in other places)
-function MedianFilter(first_val::Float64, max_window_size::Int64)
-    low_heap = MutableBinaryHeap{Tuple{Float64,Int64},TupleReverse}()
-    high_heap = MutableBinaryHeap{Tuple{Float64,Int64},TupleForward}()
-    heap_positions = CircularBuffer{Tuple{Bool,Int64}}(max_window_size)
+function MedianFilter(first_val::T, max_window_size::Int) where T <: Real
+    low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
+    high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
+    heap_positions = CircularBuffer{Tuple{Bool,Int}}(max_window_size)
     
     first_val_ind = push!(low_heap, (first_val, 1))
     
@@ -59,7 +67,7 @@ function median(mf::MedianFilter)
     if length(mf.low_heap) == length(mf.high_heap)
         # even number of elements
         # median is mean of both top elements
-        return (first(mf.low_heap)[1] + first(mf.high_heap)[1]) / 2
+        return first(mf.low_heap)[1]/2 + first(mf.high_heap)[1]/2
     else
         # odd number of elements
         return first(mf.low_heap)[1]
@@ -189,7 +197,7 @@ function shrink!(mf::MedianFilter)
     return median(mf)
 end
 
-function roll!(mf::MedianFilter, val::Float64)
+function roll!(mf::MedianFilter, val)
     if length(mf.heap_pos) != capacity(mf.heap_pos)
         error("When rolling, maximum capacity of ring buffer must be met")
     end
@@ -308,7 +316,7 @@ function symmetric_running_median(input::Array{T,1}, window_size::Integer) where
     else
         N_out = N
     end
-    output = Array{T,1}(undef, N_out)
+    output = Array{Float64,1}(undef, N_out)
 
     # construct MedianFilter
     i = 1
@@ -364,7 +372,7 @@ function asymmetric_running_median(input::Array{T,1}, window_size::Integer) wher
     
     # allocate output
     N_out = N + window_size - 1
-    output = Array{T,1}(undef, N_out)
+    output = Array{Float64,1}(undef, N_out)
 
     # construct MedianFilter
     i = 1
@@ -415,7 +423,7 @@ function asymmetric_truncated_running_median(input::Array{T,1}, window_size::Int
     else
         N_out = N
     end
-    output = Array{T,1}(undef, N_out)
+    output = Array{Float64,1}(undef, N_out)
 
     # construct MedianFilter
     i = 1
@@ -468,7 +476,7 @@ function untapered_running_median(input::Array{T,1}, window_size::Integer) where
 
     # allocate output
     N_out = N - window_size + 1
-    output = Array{T,1}(undef, N_out)
+    output = Array{Float64,1}(undef, N_out)
 
     # construct MedianFilter
     i = 1

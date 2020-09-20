@@ -27,8 +27,9 @@ function check_health(mf::MedianFilter)
     end
 end
 
+println("running tests...")
+
 @testset "FastRunningMedian Tests" begin
-    println("running tests...")
 
     @testset "Stateful API Tests" begin
         
@@ -70,9 +71,9 @@ end
                 for i in 1:n
                     random_number = rand()
                     push!(cb, random_number)
-                    #println("before rolling with ", random_number, ": ", mf)
+                    # println("before rolling with ", random_number, ": ", mf)
                     mf_median = roll!(mf, random_number)
-                    #println("after rolling with ", random_number, ": ", mf)
+                    # println("after rolling with ", random_number, ": ", mf)
                     check_health(mf)
                     cb_median = Statistics.median(cb)
                     @assert mf_median == cb_median
@@ -119,7 +120,7 @@ end
         # :asymmetric or :asym (window full length to one side, length length N+W-1 if odd W, N-1+W if even window)
         # :asymmetric_truncated or :asymtrunc (same as asymmetric, but truncated at ends to size of symmetric)
         # :none or :no (only full length window used, length N-W+1)
-        #
+        # 
         # all these taperings are symmetrical in that they behave the same at each end of the array, only mirrored
 
         @testset "Basic API examples" begin
@@ -127,7 +128,8 @@ end
             @test running_median([1.], 1) == [1.]
             @test running_median([1., 2., 3.], 1) == [1., 2., 3.]
             @test running_median([1., 4., 2., 1.], 3) == [1., 2., 2., 1.]
-            @test_broken running_median([1, 4, 2, 1], 3) == [1, 2, 2, 1]
+            @test running_median([1, 4, 2, 1], 3) == [1, 2, 2, 1]
+            @test running_median([1, 4, 2, 1], 3, :asym) == [1, 2.5, 2, 2, 1.5, 1]
             @test running_median([1., 4., 2., 1.], 3, :sym) == [1., 2., 2., 1.]
             @test running_median([1., 4., 2., 1.], 3, :symmetric) == [1., 2., 2., 1.]
             @test running_median([1., 4., 2., 1.], 3, :asym) == [1., 2.5, 2., 2., 1.5, 1.]
@@ -198,62 +200,71 @@ end
                     window_size = length(input)
                 end
                 growing_phase_inds = [1:k for k in 1:window_size]
-                rolling_phase_inds = [k:k+window_size-1 for k in 2:(length(input)-window_size+1)]
-                shrinking_phase_inds = [length(input)-k+1:length(input) for k in window_size-1:-1:1]
+                rolling_phase_inds = [k:k + window_size - 1 for k in 2:(length(input) - window_size + 1)]
+                shrinking_phase_inds = [length(input) - k + 1:length(input) for k in window_size - 1:-1:1]
                 phase_inds = [growing_phase_inds; rolling_phase_inds; shrinking_phase_inds]
                 output = [Statistics.median(input[inds]) for inds in phase_inds]
                 return output
             end
 
             for i in 1:100
-                N = rand(1:10_000)
-                w = rand(1:500)
-                x = rand(N)
-                @test naive_asymmetric_median(x,w) == running_median(x, w, :asym)
+                N = rand(1:50)
+                w = rand(1:60)
+                x = rand(Float64, N)
+                @test naive_asymmetric_median(x, w) == running_median(x, w, :asym)
+            end
+
+            @testset "compare to naive_asymmetric_median with Ints" begin
+                for i in 1:100
+                    N = rand(1:50)
+                    w = rand(1:60)
+                    x = rand(Int, N)
+                    @test naive_asymmetric_median(x, w) ≈ running_median(x, w, :asym)
+                end
             end
         end
 
         @testset "compare to naive untapered median from RollingFunctions" begin
             using RollingFunctions
             for i in 1:100
-                N = rand(1:10_000)
-                w = rand(1:500)
+                N = rand(1:50)
+                w = rand(1:60)
                 x = rand(N)
                 if w > N
                     rf_w = N
                 else
                     rf_w = w
                 end
-                @test rollmedian(x,rf_w) == running_median(x, w, :none)
+                @test rollmedian(x, rf_w) == running_median(x, w, :none)
             end
         end
 
         @testset "compare to naive_asymmetric_truncated_median" begin
-        function naive_asymmetric_truncated_median(input, window_size)
-            if window_size > length(input)
-                window_size = length(input)
+            function naive_asymmetric_truncated_median(input, window_size)
+                if window_size > length(input)
+                    window_size = length(input)
+                end
+
+                if window_size |> iseven
+                    alpha = (window_size / 2 + 1) |> Int
+                else
+                    alpha = ((window_size + 1) / 2) |> Int
+                end
+                growing_phase_inds = [1:k for k in alpha:window_size]
+                rolling_phase_inds = [k:k + window_size - 1 for k in 2:(length(input) - window_size + 1)]
+                shrinking_phase_inds = [length(input) - k + 1:length(input) for k in window_size - 1:-1:alpha]
+                phase_inds = [growing_phase_inds; rolling_phase_inds; shrinking_phase_inds]
+                output = [Statistics.median(input[inds]) for inds in phase_inds]
+                return output
             end
 
-            if window_size|>iseven
-                alpha = (window_size/2+1)|>Int
-            else
-                alpha = ((window_size+1)/2)|>Int
+            for i in 1:100
+                N = rand(1:40)
+                w = rand(1:50)
+                x = rand(N)
+                @test naive_asymmetric_truncated_median(x, w) == running_median(x, w, :asym_trunc)
             end
-            growing_phase_inds = [1:k for k in alpha:window_size]
-            rolling_phase_inds = [k:k+window_size-1 for k in 2:(length(input)-window_size+1)]
-            shrinking_phase_inds = [length(input)-k+1:length(input) for k in window_size-1:-1:alpha]
-            phase_inds = [growing_phase_inds; rolling_phase_inds; shrinking_phase_inds]
-            output = [Statistics.median(input[inds]) for inds in phase_inds]
-            return output
-        end
-
-        for i in 1:100
-            N = rand(1:40)
-            w = rand(1:50)
-            x = rand(N)
-            @test naive_asymmetric_truncated_median(x,w) == running_median(x, w, :asym_trunc)
-        end
         end
         
     end
-end # super-testset
+end # all tests
