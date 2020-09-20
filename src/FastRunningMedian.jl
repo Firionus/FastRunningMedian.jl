@@ -2,7 +2,10 @@ module FastRunningMedian
 
 using DataStructures
 
-export runningmedian, MedianFilter, grow!, median, length, shrink!, roll!, running_median
+# Stateful API
+export MedianFilter, grow!, shrink!, roll!, isfull, median, length, window_size
+# Stateless API
+export running_median
 
 # Custom Orderings for DataStructures.MutableBinaryHeap
 struct TupleForward <: Base.Ordering end
@@ -11,8 +14,7 @@ Base.lt(o::TupleForward, a, b) = a[1] < b[1]
 struct TupleReverse <: Base.Ordering end
 Base.lt(o::TupleReverse, a, b) = a[1] > b[1]
 
-# TODO constructor and grow! with multiple values (sort should be faster than a lot of growing, right? Gotta push! onto heap in the right order to avoid bubbling though. )
-
+# Main struct in this package - provides state for stateful median calculation
 mutable struct MedianFilter{T}
     low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse} 
     high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward}
@@ -36,14 +38,19 @@ mutable struct MedianFilter{T}
         return new{T}(low_heap, high_heap, heap_pos, heap_pos_offset)
     end
 end
-# TODO generic typing (Real?) instead of Float64
 
-# Constructor
-# TODO Documentation (here and in other places)
-function MedianFilter(first_val::T, max_window_size::Int) where T <: Real
+"""
+    MedianFilter(first_val::T, window_size::Int) where T <: Real
+
+Construct a stateful running median filter. 
+
+Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref). 
+Query with [`median`](@ref), [`length`](@ref), [`window_size`](@ref), [`isfull`](@ref). 
+"""
+function MedianFilter(first_val::T, window_size::Int) where T <: Real
     low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
     high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
-    heap_positions = CircularBuffer{Tuple{Bool,Int}}(max_window_size)
+    heap_positions = CircularBuffer{Tuple{Bool,Int}}(window_size)
     
     first_val_ind = push!(low_heap, (first_val, 1))
     
@@ -51,14 +58,17 @@ function MedianFilter(first_val::T, max_window_size::Int) where T <: Real
     
     MedianFilter(low_heap, high_heap, heap_positions, 0)
 end
+# TODO constructor and grow! with multiple values (sort should be faster than a lot of growing, right? Gotta push! onto heap in the right order to avoid bubbling though. )
 
 """
     median(mf::MedianFilter)
 
 Determine the current median in mf. 
 
-If the number of elements in MedianFilter is odd, the low_heap shall always be one element bigger than
-the high_heap. The top element of the low_heap then is the median. 
+## Implementation
+
+If the number of elements in MedianFilter is odd, the low\\_heap is always one element bigger than
+the high\\_heap. The top element of the low\\_heap then is the median. 
 
 If the number of elements in MedianFilter is even, both heaps are the same size and the
 median is the mean of both top elements. 
@@ -67,30 +77,51 @@ function median(mf::MedianFilter)
     if length(mf.low_heap) == length(mf.high_heap)
         # even number of elements
         # median is mean of both top elements
-        return first(mf.low_heap)[1]/2 + first(mf.high_heap)[1]/2
+        return first(mf.low_heap)[1] / 2 + first(mf.high_heap)[1] / 2
     else
         # odd number of elements
         return first(mf.low_heap)[1]
     end
 end
 
+"""
+    length(mf::MedianFilter)
+
+Returns the number of elements in the stateful median filter `mf`. 
+
+This number is equal to the length of the internal circular buffer. 
+"""
 Base.length(mf::MedianFilter) = mf.heap_pos |> length
 
+"""
+    window_size(mf::MedianFilter)
+
+Returns the window_size of the stateful median filter `mf`. 
+
+This number is equal to the capacity of the internal circular buffer. 
+"""
+window_size(mf::MedianFilter) = mf.heap_pos |> DataStructures.capacity
+
+"""
+    isfull(mf::MedianFilter)
+
+Returns true, when the length of the stateful median filter `mf` equals its window\\_size. 
+"""
 isfull(mf::MedianFilter) = mf.heap_pos |> DataStructures.isfull
 
 """
     grow!(mf::MedianFilter, val)
 
-Grow mf with the new element val. 
+Grow mf with the new value val. 
 
 Returns the updated median. If mf would grow beyond
-maximum window size, an error is thrown. In this case you probably wanted to use roll!. 
+maximum window size, an error is thrown. In this case you probably wanted to use [`roll!`](@ref). 
 
 The new element is pushed onto the end of the circular buffer. 
 """
 function grow!(mf::MedianFilter, val)
     # check that we don't grow beyond circular buffer capacity
-    if length(mf.heap_pos) + 1 > capacity(mf.heap_pos)
+    if length(mf) + 1 > window_size(mf)
         error("grow! would grow circular buffer length by 1 and therefore exceed circular buffer capacity")
     end
 
@@ -100,7 +131,9 @@ function grow!(mf::MedianFilter, val)
         middle_high = first(mf.high_heap)
         if val <= middle_high[1]
             # just push! new value onto low_heap
-            _push_onto_heap!(mf, val, onto_low_heap=true)
+            pushed_handle = push!(mf.low_heap, (val, 0))
+            push!(mf.heap_pos, (true, pushed_handle))
+            mf.low_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
         else
             # replace middle_high in high_heap with new val and move middle_high to low_heap
 
@@ -119,7 +152,9 @@ function grow!(mf::MedianFilter, val)
         current_median = first(mf.low_heap)
         if val >= current_median[1]
             # just push! new value onto high_heap
-            _push_onto_heap!(mf, val, onto_low_heap=false)
+            pushed_handle = push!(mf.high_heap, (val, 0))
+            push!(mf.heap_pos, (false, pushed_handle))
+            mf.high_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
         else
             # replace current_median in low_heap with new val and move current_median to high_heap
 
@@ -136,21 +171,6 @@ function grow!(mf::MedianFilter, val)
 
     return median(mf)
 end
-
-"just push a new value onto one of the heaps and update heap_pos accordingly"
-function _push_onto_heap!(mf::MedianFilter, val; onto_low_heap::Bool)
-    if onto_low_heap == true
-        pushed_handle = push!(mf.low_heap, (val, 0))
-        push!(mf.heap_pos, (true, pushed_handle))
-        mf.low_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
-    else
-        pushed_handle = push!(mf.high_heap, (val, 0))
-        push!(mf.heap_pos, (false, pushed_handle))
-        mf.high_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
-    end
-end
-
-
 
 """
     shrink!(mf::MedianFilter)
@@ -197,15 +217,22 @@ function shrink!(mf::MedianFilter)
     return median(mf)
 end
 
+"""
+    roll!(mf::MedianFilter, val)
+
+Roll the window over to the next position by replacing the first and oldest element in the ciruclar buffer with the new value val. 
+
+Will error when `mf` is not full yet - in this case you must first [`grow!`](@ref) mf to maximum capacity. 
+"""
 function roll!(mf::MedianFilter, val)
-    if length(mf.heap_pos) != capacity(mf.heap_pos)
+    if !isfull(mf)
         error("When rolling, maximum capacity of ring buffer must be met")
     end
 
     to_replace = mf.heap_pos[1]
-    new_heap_element = (val, capacity(mf.heap_pos) + mf.heap_pos_offset + 1)
+    new_heap_element = (val, window_size(mf) + mf.heap_pos_offset + 1)
 
-    if capacity(mf.heap_pos) == 1
+    if window_size(mf) == 1
         update!(mf.low_heap, to_replace[2], new_heap_element)
         push!(mf.heap_pos, to_replace)
         mf.heap_pos_offset += 1
@@ -270,6 +297,21 @@ function roll!(mf::MedianFilter, val)
     return median(mf)
 end
 
+"""
+    running_median(input, window_size, tapering=:symmetric)
+
+Run a median filter of `window_size` over the input array and return the result. 
+
+## Taperings
+
+The tapering decides the behaviour at the ends of the input. All taperings are mirror symmetric with respect to the middle of the input array. The available taperings are:
+- `:symmteric` or `:sym`: Ensure that the window is symmetric around each point of the output array by always growing or shrinking the window by 2. The output has the same length as the input if `window_size` is odd. If `window_size` is even, the output has one element less. 
+- `:asymmetric` or `:asym`: Always adds or removes one element when calculating the next output value. Creates asymmetric windowing at the edges of the array. If the input is N long, the output is N+window_size-1 elements long. 
+- `:asymmetric_truncated` or `:asym_trunc`: The same as asymmetric, but truncated at beginning and end to match the size of `:symmetric`. 
+- `:none` or `:no`: No tapering towards the ends. If the input has N elements, the output is only N-window_size+1 long. 
+
+If you choose an even `window_size`, the elements of the output array lie in the middle between the input elements on a continuous underlying axis. 
+"""
 function running_median(input::Array{T,1}, window_size::Integer, tapering=:symmetric) where T <: Real
     if length(input) == 0
         error("input array must be non-empty")
@@ -280,8 +322,6 @@ function running_median(input::Array{T,1}, window_size::Integer, tapering=:symme
     elseif window_size == 1
         return input
     end
-
-
 
     if tapering == :symmetric || tapering == :sym
         symmetric_running_median(input, window_size)
@@ -431,7 +471,7 @@ function asymmetric_truncated_running_median(input::Array{T,1}, window_size::Int
     i += 1
 
     # pre-output grow phase
-    while length(mf) <= window_size/2
+    while length(mf) <= window_size / 2
         grow!(mf, input[i])
         i += 1
     end
@@ -503,74 +543,5 @@ function untapered_running_median(input::Array{T,1}, window_size::Integer) where
 
     return output
 end
-
-# TODO remove restrictions on input and window size where reasonably well defined behaviour can be accomplished
-# TODO add asymmetric tapering of window towards end
-"""
-    runningmedian(input::Array{Float64, 1}, max_window_size=53)
-
-Compute the running median over input with maximum window size of `max_window_size`. 
-
-`max_window_size` must be an odd number. 
-
-The window is shrinked towards the start and end such that it is symmetric around the center value. 
-Therefore, the first and last values of the returned array are the same as in input. 
-
-The implementation uses an efficient double heap algorithm that scales roughly O(N log(W)) where 
-N is the size of `input` and W is the window size. 
-"""
-function runningmedian(input::Array{Float64,1}, max_window_size=53)
-    if iseven(max_window_size) || max_window_size <= 1
-        error("max_window_size must be odd number of 3 or bigger")
-    elseif length(input) < 3
-       error("input must be at least 3 elements long, otherwise function would return identity")
-    else # max_window_size is odd
-        if length(input) |> isodd
-            max_possible_window_size = length(input)
-        else
-            max_possible_window_size = length(input) - 1
-        end
-    end
-
-    # assign no value bigger than max_possible_window_size to not break circular buffer behaviour
-    if max_possible_window_size < max_window_size
-        max_window_size = max_possible_window_size
-    end
-
-    # allocate output array
-    output = similar(input)
-    
-    # maximum one-sided offset
-    max_offset = round((max_window_size - 1) / 2, Base.Rounding.RoundNearestTiesAway) |> Int
-    
-    prev_offset = 0
-    mymf = MedianFilter(input[1], max_window_size)
-    output[1] = median(mymf)
-    
-    for j in 2:length(input)
-        current_offset = min(max_offset, j - 1, length(input) - j)
-        # println(prev_offset, " followed by ", current_offset)
-        if current_offset == prev_offset + 1
-            # grow
-            output[j] = growby2!(mymf, input[j + current_offset - 1:j + current_offset])
-        elseif current_offset == prev_offset - 1
-            # shrink
-            output[j] = shrinkby2!(mymf)
-        elseif current_offset == prev_offset
-            # roll
-            output[j] = roll!(mymf, input[j + current_offset])
-        else
-            println("max_offset is ", max_offset)
-            error("current_offset and prev_offset do not differ by -2, 0 or 2.")
-        end
-        prev_offset = current_offset
-        # println(mymf)
-        # DEBUG STATEMENT ONLY REMOVE IN PRODUCTION
-        check_health(mymf)
-    end
-    output
-end
-
-
 
 end # module
