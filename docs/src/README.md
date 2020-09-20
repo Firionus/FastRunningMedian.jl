@@ -36,3 +36,7 @@ isfull
 W. Hardle, W. Steiger 1995: Optimal Median Smoothing. Published in  Journal of the Royal Statistical Society, Series C (Applied Statistics), Vol. 44, No. 2 (1995), pp. 258-264. <https://doi.org/10.2307/2986349>
 
 (I did not implement their custom double heap, but used two heaps from [DataStructures.jl](https://github.com/JuliaCollections/DataStructures.jl))
+
+## Keywords
+
+Running Median is also known as Rolling Median or Moving Median. 
