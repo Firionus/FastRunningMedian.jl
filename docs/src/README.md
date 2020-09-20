@@ -24,6 +24,8 @@ running_median
 
 ![Benchmark Comparison](docs/src/Running%20Median%20Benchmarks.png)
 
+In contrast to this package, [SortFilters.jl](https://github.com/sairus7/SortFilters.jl) also supports arbitrary percentage levels so you can for example calculate quantiles. 
+
 ## Stateful API
 
 FastRunningMedian provides a stateful API that can be used for streaming data, e. g. to reduce RAM consumption, or build your own high-level API.

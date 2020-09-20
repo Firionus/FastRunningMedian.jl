@@ -77,6 +77,9 @@ The underlying algorithm should scale as O(N log w) with the input size N and th
 ![Benchmark Comparison](docs/src/Running%20Median%20Benchmarks.png)
 
 
+In contrast to this package, [SortFilters.jl](https://github.com/sairus7/SortFilters.jl) also supports arbitrary percentage levels so you can for example calculate quantiles. 
+
+
 <a id='Stateful-API'></a>
 
 <a id='Stateful-API-1'></a>
