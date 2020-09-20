@@ -111,7 +111,7 @@ isfull(mf::MedianFilter) = mf.heap_pos |> DataStructures.isfull
 """
     grow!(mf::MedianFilter, val)
 
-Grow mf with the new value val. 
+Grow mf with the new value `val`. 
 
 Returns the updated median. If mf would grow beyond
 maximum window size, an error is thrown. In this case you probably wanted to use [`roll!`](@ref). 
