@@ -58,12 +58,11 @@ function MedianFilter(first_val::T, window_size::Int) where T <: Real
     
     MedianFilter(low_heap, high_heap, heap_positions, 0)
 end
-# TODO constructor and grow! with multiple values (sort should be faster than a lot of growing, right? Gotta push! onto heap in the right order to avoid bubbling though. )
 
 """
     median(mf::MedianFilter)
 
-Determine the current median in mf. 
+Determine the current median in `mf`. 
 
 ## Implementation
 
@@ -175,7 +174,7 @@ end
 """
     shrink!(mf::MedianFilter)
 
-Shrinks mf by removing the first and oldest element in the circular buffer. 
+Shrinks `mf` by removing the first and oldest element in the circular buffer. 
 
 Returns the updated median. Will error if mf contains only one element as a MedianFilter with zero elements
 would not have a median. 
@@ -220,7 +219,7 @@ end
 """
     roll!(mf::MedianFilter, val)
 
-Roll the window over to the next position by replacing the first and oldest element in the ciruclar buffer with the new value val. 
+Roll the window over to the next position by replacing the first and oldest element in the ciruclar buffer with the new value `val`. 
 
 Will error when `mf` is not full yet - in this case you must first [`grow!`](@ref) mf to maximum capacity. 
 """
@@ -311,6 +310,10 @@ The tapering decides the behaviour at the ends of the input. All taperings are m
 - `:none` or `:no`: No tapering towards the ends. If the input has N elements, the output is only N-window_size+1 long. 
 
 If you choose an even `window_size`, the elements of the output array lie in the middle between the input elements on a continuous underlying axis. 
+
+## Performance
+
+The underlying algorithm should scale as O(N log w) with the input size N and the window_size w. 
 """
 function running_median(input::Array{T,1}, window_size::Integer, tapering=:symmetric) where T <: Real
     if length(input) == 0

@@ -1,0 +1,3 @@
+open Julia in the docs directory
+]activate .
+include("make.jl")
