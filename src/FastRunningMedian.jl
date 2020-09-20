@@ -11,7 +11,7 @@ Base.lt(o::TupleForward, a, b) = a[1] < b[1]
 struct TupleReverse <: Base.Ordering end
 Base.lt(o::TupleReverse, a, b) = a[1] > b[1]
 
-# TODO constructor and grow! with multiple values
+# TODO constructor and grow! with multiple values (sort should be faster than a lot of growing, right? Gotta push! onto heap in the right order to avoid bubbling though. )
 
 mutable struct MedianFilter 
     low_heap::MutableBinaryHeap{Tuple{Float64, Int64}, TupleReverse} 
@@ -31,6 +31,7 @@ end
 # TODO generic typing (Real?) instead of Float64
 
 # Constructor
+# TODO Documentation (here and in other places)
 function MedianFilter(first_val::Float64, max_window_size::Int64)
     low_heap = MutableBinaryHeap{Tuple{Float64, Int64}, TupleReverse}()
     high_heap = MutableBinaryHeap{Tuple{Float64, Int64}, TupleForward}()
@@ -195,8 +196,7 @@ function roll!(mf::MedianFilter, val::Float64)
         error("When rolling, maximum capacity of ring buffer must be met")
     end
     # TODO remove this restriction - may want to run 53 window over 6 data points. It is totally well defined. 
-    
-    
+
     if val <= median(mf)
         val_goes_into_low_heap = true
     else
@@ -251,10 +251,19 @@ function roll!(mf::MedianFilter, val::Float64)
     return median(mf)
 end
 
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# CONTINUE HERE
-# TODO rewrite runningmedian
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+function running_median(input::Array{T, 1}, window_size::Integer, tapering=:symmetric) where T <: Real
+    if window_size < 1
+        error("window_size must be 1 or bigger")
+    elseif window_size|>iseven
+        error("window_size must be an odd number")
+    end
+
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # CONTINUE HERE
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+end
+
 
 
 # TODO remove restrictions on input and window size where reasonably well defined behaviour can be accomplished
@@ -324,20 +333,6 @@ function runningmedian(input::Array{Float64, 1}, max_window_size=53)
     output
 end
 
-function check_health(mymf::MedianFilter)
-    # sanity check
-    for k in 1:length(mymf.heap_pos)
-        current_heap, current_heap_ind = mymf.heap_pos[k]
-        if current_heap == true
-            a = mymf.low_heap[current_heap_ind][2] - mymf.heap_pos_offset
-            #println(k, " ?= ", a)
-            @assert k == a
-        else
-            a = mymf.high_heap[current_heap_ind][2] - mymf.heap_pos_offset
-            #println(k, " ?= ", a)
-            @assert k == a
-        end
-    end
-end
+
 
 end # module
