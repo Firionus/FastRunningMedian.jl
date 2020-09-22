@@ -4,7 +4,7 @@ This Julia Package allows you to calculate a running median - fast.
 
 ## Installation
 
-In Julia, execute: 
+In Julia, execute:
 
 ```julia
 ]add https://github.com/Firionus/FastRunningMedian.git
@@ -24,7 +24,9 @@ running_median
 
 ![Benchmark Comparison](docs/src/Running%20Median%20Benchmarks.png)
 
-In contrast to this package, [SortFilters.jl](https://github.com/sairus7/SortFilters.jl) also supports arbitrary percentage levels so you can for example calculate quantiles. 
+For large window sizes, this package performs even better than calling `runmed` in R, which uses the Turlach implementation written in C. For small window sizes, the Stuetzle implementation in R still outperforms this package, but the overhead from RCall doesn't seem worth it. If you want to add a fast implementation for small window sizes to this package, feel free to put in a PR or open an issue with any questions you might have. 
+
+In contrast to this package, [SortFilters.jl](https://github.com/sairus7/SortFilters.jl) supports arbitrary probability levels, for example to calculate quantiles.
 
 ## Stateful API
 
@@ -49,4 +51,4 @@ W. Hardle, W. Steiger 1995: Optimal Median Smoothing. Published in  Journal of t
 
 ## Keywords
 
-Running Median is also known as Rolling Median or Moving Median. 
+Running Median is also known as Rolling Median or Moving Median.
