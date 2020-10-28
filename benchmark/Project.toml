@@ -1,0 +1,7 @@
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+FastRunningMedian = "3a47ddbd-112b-4cc1-b00e-3746ec434ee5"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+RCall = "6f49c342-dc21-5d91-9882-a32aef131414"
+RollingFunctions = "b0e4dd01-7b14-53d8-9b45-175a3e362653"
+SortFilters = "d6dedbf8-78c7-4e81-bd5f-fe48695b798a"

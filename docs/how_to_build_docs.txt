@@ -1,3 +1,4 @@
 open Julia in the docs directory
 ]activate .
+]instantiate
 include("make.jl")

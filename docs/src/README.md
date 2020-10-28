@@ -18,15 +18,19 @@ running_median
 
 ## Taperings Visualized
 
+Each data point is shown as a cross and the windows are visualized as colored boxes, the input is grey. 
+
 ![Tapering Examples](docs/src/tapering%20examples.png)
 
 ## Performance Comparison
 
 ![Benchmark Comparison](docs/src/Running%20Median%20Benchmarks.png)
 
-For large window sizes, this package performs even better than calling `runmed` in R, which uses the Turlach implementation written in C. For small window sizes, the Stuetzle implementation in R still outperforms this package, but the overhead from RCall doesn't seem worth it. If you want to add a fast implementation for small window sizes to this package, feel free to put in a PR or open an issue with any questions you might have. 
+For large window sizes, this package performs even better than calling `runmed` in R, which uses the Turlach implementation written in C. For small window sizes, the Stuetzle implementation in R still outperforms this package, but the overhead from RCall doesn't seem worth it. If you want to add a fast implementation for small window sizes to this package, feel free to put in a PR or open an issue with any questions you might have.
 
 In contrast to this package, [SortFilters.jl](https://github.com/sairus7/SortFilters.jl) supports arbitrary probability levels, for example to calculate quantiles.
+
+You can find the Notebook used to create the above graph in the `benchmark` folder. I ran it on an i7-2600K with 8 GB RAM while editing and browsing in the background. 
 
 ## Stateful API
 
