@@ -7,7 +7,7 @@ This Julia Package allows you to calculate a running median - fast.
 In Julia, execute:
 
 ```julia
-]add https://github.com/Firionus/FastRunningMedian.git
+]add FastRunningMedian
 ```
 
 ## High-level API
