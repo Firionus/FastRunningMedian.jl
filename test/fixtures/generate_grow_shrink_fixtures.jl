@@ -1,8 +1,13 @@
 # please instantiate ./test/Manifest.toml for this
 
-using Combinatorics, JLD2, Statistics
+using Combinatorics, JLD2, DataStructures
+import Statistics
 
-# Grow and Shrink Fixtures
+# ===============================
+# Grow and Shrink Fuzz Fixtures
+# ===============================
+
+# format: [(values, expected_medians)]
 
 grow_shrink_values = [[1.], [1,2], [2,1]]
 append!(grow_shrink_values, permutations([1,2,3])|>collect)

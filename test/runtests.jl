@@ -58,35 +58,30 @@ println("running tests...")
             end
             
             for fixture in grow_shrink_fixtures
-                #println("running grow_shrink test with ", fixture[1])
-                grow_and_shrink_test(fixture[1], fixture[2])
+                grow_and_shrink_test(fixture...)
             end
         end
         
         @testset "Roll Fuzz" begin
-            for i in 1:100
-                N = rand(1:1_000)
-                x = rand(N)
-                mf = MedianFilter(x[1], N)
-                cb = CircularBuffer{Float64}(N)
-                push!(cb, x[1])
-                for i in 2:length(x)
-                    grow!(mf, x[i])
-                    check_health(mf)
-                    push!(cb, x[i])
+            #load test cases
+            @load "fixtures/roll.jld2" roll_fixtures
+
+            function roll_test(initial_values, roll_values, expected_medians)
+                window_size = length(initial_values)
+                mf = MedianFilter(initial_values[1], window_size)
+                for i in 2:window_size
+                    grow!(mf, initial_values[i])
                 end
-                @assert capacity(cb) == length(cb)
-                n = rand(1_000:2_000)
-                for i in 1:n
-                    random_number = rand()
-                    push!(cb, random_number)
-                    # println("before rolling with ", random_number, ": ", mf)
-                    mf_median = roll!(mf, random_number)
-                    # println("after rolling with ", random_number, ": ", mf)
+                @assert length(mf) == window_size
+                for i in 1:length(roll_values)
+                    mf_median = roll!(mf, roll_values[i])
                     check_health(mf)
-                    cb_median = Statistics.median(cb)
-                    @assert mf_median == cb_median
+                    @assert mf_median == expected_medians[i]
                 end
+            end
+
+            for fixture in roll_fixtures
+                roll_test(fixture...)
             end
         end
 
