@@ -1,4 +1,4 @@
-using FastRunningMedian, Test, DataStructures
+using FastRunningMedian, Test, DataStructures, JLD2
 import Statistics
 
 """
@@ -34,23 +34,32 @@ println("running tests...")
     @testset "Stateful API Tests" begin
         
         @testset "Grow and Shrink Fuzz" begin
-            for j in 1:50
-                N = rand(1:200)
-                x = rand(N)
-                mf = MedianFilter(x[1], N)
+            # load test cases
+            @load "fixtures/grow_shrink.jld2" grow_shrink_fixtures
+
+            function grow_and_shrink_test(values, expected_medians)
+                N = length(values)
+                mf = MedianFilter(values[1], N)
                 check_health(mf)
-                # grow phase
-                for i in 2:length(x)
-                    grow!(mf, x[i])
+                @assert median(mf) == expected_medians[1]
+                #grow phase
+                for i in 2:N
+                    grow!(mf, values[i])
                     check_health(mf)
-                    @assert Statistics.median(x[1:i]) == median(mf)
+                    @assert median(mf) == expected_medians[i]
                 end
                 # shrink phase
-                for i in 2:length(x)
+                for i in N+1:2N-1
                     shrink!(mf)
                     check_health(mf)
-                    @assert Statistics.median(x[i:end]) == median(mf)
+                    @assert median(mf) == expected_medians[i]
                 end
+                @assert length(mf) == 1
+            end
+            
+            for fixture in grow_shrink_fixtures
+                #println("running grow_shrink test with ", fixture[1])
+                grow_and_shrink_test(fixture[1], fixture[2])
             end
         end
         
