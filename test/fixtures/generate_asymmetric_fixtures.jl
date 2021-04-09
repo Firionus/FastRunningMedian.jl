@@ -1,6 +1,7 @@
 # please instantiate ./test/Manifest.toml for this
 
 using JLD2
+import Statistics
 
 # ========================================
 # Asymmetric Fuzz Test Fixtures

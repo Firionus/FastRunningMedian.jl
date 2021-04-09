@@ -146,54 +146,11 @@ println("running tests...")
         end
 
         
-        @testset "compare to naive_symmetric_median" begin
-
-            function naive_symmetric_median(arr, window)       
-                output = similar(arr)
-                offset = round((window - 1) / 2, Base.Rounding.RoundNearestTiesAway) |> Int
-                for j in eachindex(arr)
-                    temp_offset = min(offset, j - 1, length(arr) - j)
-                    beginning = j - temp_offset
-                    ending = j + temp_offset
-                    to_median = arr[beginning:ending] |> skipmissing
-                    output[j] = Statistics.median(to_median)
-                end
-                output
-            end    
-        
-            function compare_to_naive(N, w)
-                x = rand(N)
-                y = running_median(x, w)
-                y2 = naive_symmetric_median(x, w)
-                @test y == y2
+        @testset "Compare to Naive Symmetric Median" begin
+            @load "fixtures/symmetric.jld2" fixtures
+            for fixture in fixtures
+                @test fixture[3] == running_median(fixture[1], fixture[2], :sym)
             end
-
-    
-            @testset "long input to test roll!" begin
-                compare_to_naive(1_000_000, 101)
-            end
-    
-            @testset "short input, long window" begin
-                for i = 1:50
-                    N = rand(3:20)
-                    w = rand(19:2:100)
-                    compare_to_naive(N, w)
-                end
-            end
-    
-            @testset "short windows" begin
-                for i = 1:50
-                    N = rand(10:1_000)
-                    w = rand(3:2:11)
-                    compare_to_naive(N, w)
-                end
-            end
-    
-            @testset "intermediate stuff" begin
-                for i = 1:50
-                    compare_to_naive(rand(100:10_000), rand(11:2:1_000))
-                end
-            end  
         end
 
         @testset "Compare to Naive Asymmetric Median" begin
