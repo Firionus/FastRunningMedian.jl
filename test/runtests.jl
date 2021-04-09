@@ -196,47 +196,31 @@ println("running tests...")
             end  
         end
 
-        @testset "compare to naive_asymmetric_median" begin
-            function naive_asymmetric_median(input, window_size)
-                if window_size > length(input)
-                    window_size = length(input)
+        @testset "Compare to Naive Asymmetric Median" begin
+            @testset "Float Input" begin
+                @load "fixtures/asymmetric.jld2" fixtures
+                for fixture in fixtures
+                    @test fixture[3] == running_median(fixture[1], fixture[2], :asym)
                 end
-                growing_phase_inds = [1:k for k in 1:window_size]
-                rolling_phase_inds = [k:k + window_size - 1 for k in 2:(length(input) - window_size + 1)]
-                shrinking_phase_inds = [length(input) - k + 1:length(input) for k in window_size - 1:-1:1]
-                phase_inds = [growing_phase_inds; rolling_phase_inds; shrinking_phase_inds]
-                output = [Statistics.median(input[inds]) for inds in phase_inds]
-                return output
             end
 
-            for i in 1:100
-                N = rand(1:50)
-                w = rand(1:60)
-                x = rand(Float64, N)
-                @test naive_asymmetric_median(x, w) == running_median(x, w, :asym)
-            end
-
-            @testset "compare to naive_asymmetric_median with Ints" begin
-                for i in 1:100
-                    N = rand(1:50)
-                    w = rand(1:60)
-                    x = rand(Int, N)
-                    @test naive_asymmetric_median(x, w) ≈ running_median(x, w, :asym)
+            @testset "Int Input" begin
+                @load "fixtures/asymmetric_int.jld2" fixtures
+                for fixture in fixtures
+                    @test fixture[3] == running_median(fixture[1], fixture[2], :asym)
                 end
             end
         end
 
-        @testset "Test Untapered Median" begin
+        @testset "Compare to Untapered Median from RollingFunctions" begin
             @load "fixtures/untapered.jld2" untapered_fixtures
-
             for fixture in untapered_fixtures
                 @test fixture[3] == running_median(fixture[1], fixture[2], :none)
             end
         end
 
-        @testset "compare to naive_asymmetric_truncated_median" begin
+        @testset "Compare to Naive Asymmetric Truncated Median" begin
             @load "fixtures/asym_trunc.jld2" asym_trunc_fixtures
-
             for fixture in asym_trunc_fixtures
                 @test fixture[3] == running_median(fixture[1], fixture[2], :asym_trunc)
             end
