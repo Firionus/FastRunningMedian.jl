@@ -235,29 +235,10 @@ println("running tests...")
         end
 
         @testset "compare to naive_asymmetric_truncated_median" begin
-            function naive_asymmetric_truncated_median(input, window_size)
-                if window_size > length(input)
-                    window_size = length(input)
-                end
+            @load "fixtures/asym_trunc.jld2" asym_trunc_fixtures
 
-                if window_size |> iseven
-                    alpha = (window_size / 2 + 1) |> Int
-                else
-                    alpha = ((window_size + 1) / 2) |> Int
-                end
-                growing_phase_inds = [1:k for k in alpha:window_size]
-                rolling_phase_inds = [k:k + window_size - 1 for k in 2:(length(input) - window_size + 1)]
-                shrinking_phase_inds = [length(input) - k + 1:length(input) for k in window_size - 1:-1:alpha]
-                phase_inds = [growing_phase_inds; rolling_phase_inds; shrinking_phase_inds]
-                output = [Statistics.median(input[inds]) for inds in phase_inds]
-                return output
-            end
-
-            for i in 1:100
-                N = rand(1:40)
-                w = rand(1:50)
-                x = rand(N)
-                @test naive_asymmetric_truncated_median(x, w) == running_median(x, w, :asym_trunc)
+            for fixture in asym_trunc_fixtures
+                @test fixture[3] == running_median(fixture[1], fixture[2], :asym_trunc)
             end
         end
         
