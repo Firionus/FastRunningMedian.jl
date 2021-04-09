@@ -112,8 +112,6 @@ println("running tests...")
             shrink!(mf)
             @test_throws ErrorException roll!(mf, 5.)
         end
-
-
     end
 
     @testset "High Level API Tests" begin
@@ -228,18 +226,11 @@ println("running tests...")
             end
         end
 
-        @testset "compare to naive untapered median from RollingFunctions" begin
-            using RollingFunctions
-            for i in 1:100
-                N = rand(1:50)
-                w = rand(1:60)
-                x = rand(N)
-                if w > N
-                    rf_w = N
-                else
-                    rf_w = w
-                end
-                @test rollmedian(x, rf_w) == running_median(x, w, :none)
+        @testset "Test Untapered Median" begin
+            @load "fixtures/untapered.jld2" untapered_fixtures
+
+            for fixture in untapered_fixtures
+                @test fixture[3] == running_median(fixture[1], fixture[2], :none)
             end
         end
 
