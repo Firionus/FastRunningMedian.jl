@@ -1,5 +1,6 @@
 module FastRunningMedian
 
+using Base.Iterators: isdone
 using DataStructures
 
 # Stateful API
@@ -321,8 +322,6 @@ function running_median(input::AbstractVector{T}, window_size::Integer, tapering
 
     if window_size < 1
         error("window_size must be 1 or bigger")
-    elseif window_size == 1
-        return input
     end
 
     if tapering == :symmetric || tapering == :sym
@@ -360,15 +359,15 @@ function symmetric_running_median(input::AbstractVector{T}, window_size::Integer
     end
     output = Array{Float64,1}(undef, N_out)
 
+    # input iterator
+    it = Iterators.Stateful(input)
+
     # construct MedianFilter
-    i = 1
-    mf = MedianFilter(input[i], window_size)
-    i += 1
+    mf = MedianFilter(popfirst!(it), window_size)
 
     # if even, start with two elements in mf at index 1.5
     if window_size |> iseven
-        grow!(mf, input[i])
-        i += 1
+        grow!(mf, popfirst!(it))
     end
 
     # first median
@@ -378,19 +377,16 @@ function symmetric_running_median(input::AbstractVector{T}, window_size::Integer
 
     # grow phase
     while !isfull(mf)
-        grow!(mf, input[i])
-        i += 1
-        grow!(mf, input[i])
+        grow!(mf, popfirst!(it))
+        grow!(mf, popfirst!(it))
         output[j] = median(mf)
-        i += 1
         j += 1
     end
 
     # roll phase
-    while i <= N
-        roll!(mf, input[i])
+    while !isdone(it)
+        roll!(mf, popfirst!(it))
         output[j] = median(mf)
-        i += 1
         j += 1
     end
 
@@ -419,10 +415,11 @@ function asymmetric_running_median(input::AbstractVector{T}, window_size::Intege
     N_out = N + window_size - 1
     output = Array{Float64,1}(undef, N_out)
 
+    # input iterator
+    it = Iterators.Stateful(input)
+
     # construct MedianFilter
-    i = 1
-    mf = MedianFilter(input[i], window_size)
-    i += 1
+    mf = MedianFilter(popfirst!(it), window_size)
 
     # first median
     j = 1
@@ -431,17 +428,15 @@ function asymmetric_running_median(input::AbstractVector{T}, window_size::Intege
 
     # grow phase
     while !isfull(mf)
-        grow!(mf, input[i])
+        grow!(mf, popfirst!(it))
         output[j] = median(mf)
-        i += 1
         j += 1
     end
 
     # roll phase
-    while i <= N
-        roll!(mf, input[i])
+    while !isdone(it)
+        roll!(mf, popfirst!(it))
         output[j] = median(mf)
-        i += 1
         j += 1
     end
 
@@ -473,15 +468,15 @@ function asymmetric_truncated_running_median(input::AbstractVector{T}, window_si
     end
     output = Array{Float64,1}(undef, N_out)
 
+    # input iterator
+    it = Iterators.Stateful(input)
+
     # construct MedianFilter
-    i = 1
-    mf = MedianFilter(input[i], window_size)
-    i += 1
+    mf = MedianFilter(popfirst!(it), window_size)
 
     # pre-output grow phase
     while length(mf) <= window_size / 2
-        grow!(mf, input[i])
-        i += 1
+        grow!(mf, popfirst!(it))
     end
 
     # first median
@@ -491,17 +486,15 @@ function asymmetric_truncated_running_median(input::AbstractVector{T}, window_si
 
     # grow phase
     while !isfull(mf)
-        grow!(mf, input[i])
+        grow!(mf, popfirst!(it))
         output[j] = median(mf)
-        i += 1
         j += 1
     end
 
     # roll phase
-    while i <= N
-        roll!(mf, input[i])
+    while !isdone(it)
+        roll!(mf, popfirst!(it))
         output[j] = median(mf)
-        i += 1
         j += 1
     end
 
@@ -529,15 +522,15 @@ function untapered_running_median(input::AbstractVector{T}, window_size::Integer
     N_out = N - window_size + 1
     output = Array{Float64,1}(undef, N_out)
 
+    # input iterator
+    it = Iterators.Stateful(input)
+
     # construct MedianFilter
-    i = 1
-    mf = MedianFilter(input[i], window_size)
-    i += 1
+    mf = MedianFilter(popfirst!(it), window_size)
 
     # grow phase - no output yet
     while !isfull(mf)
-        grow!(mf, input[i])
-        i += 1
+        grow!(mf, popfirst!(it))
     end
     
     # first median
@@ -546,10 +539,9 @@ function untapered_running_median(input::AbstractVector{T}, window_size::Integer
     j += 1
 
     # roll phase
-    while i <= N
-        roll!(mf, input[i])
+    while !isdone(it)
+        roll!(mf, popfirst!(it))
         output[j] = median(mf)
-        i += 1
         j += 1
     end
 

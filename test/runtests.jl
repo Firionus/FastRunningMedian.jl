@@ -1,4 +1,4 @@
-using FastRunningMedian, Test, DataStructures, JLD2
+using FastRunningMedian, Test, DataStructures, JLD2, OffsetArrays
 import Statistics
 
 """
@@ -147,6 +147,22 @@ println("running tests...")
                 [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
         end
 
+        @testset "Basic API Examples with OffsetArrays" begin
+            for offset in (-999, -1, 1, 888)
+                @test running_median(OffsetArray([1.], offset), 1) == [1.]
+                @test running_median(OffsetArray([1., 2., 3.], offset), 1) == [1., 2., 3.]
+                @test running_median(OffsetArray([1., 4., 2., 1.], offset), 3) == [1., 2., 2., 1.]
+                @test running_median(OffsetArray([1, 4, 2, 1], offset), 3) == [1, 2, 2, 1]
+                @test running_median(OffsetArray([1, 4, 2, 1], offset), 3, :asym) == [1, 2.5, 2, 2, 1.5, 1]
+                @test running_median(OffsetArray([1., 4., 2., 1.], offset), 3, :sym) == [1., 2., 2., 1.]
+                @test running_median(OffsetArray([1., 4., 2., 1.], offset), 3, :asym) == [1., 2.5, 2., 2., 1.5, 1.]
+                @test running_median(OffsetArray([1., 4., 2., 1.], offset), 3, :asym_trunc) == [2.5, 2., 2., 1.5]
+                @test running_median(OffsetArray([1., 4., 2., 1.], offset), 3, :no) == [2., 2.]
+                @test running_median(OffsetArray([1., 2., 1., 2., 1., 3.], offset), 101) == [1., 1., 1., 2., 2., 3.]
+                @test running_median(OffsetArray([1., 1., 2., 1., 1., 1., 1., 1., 2., 1.], offset), 99) == 
+                    [1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
+            end
+        end
         
         @testset "Compare to Naive Symmetric Median" begin
             @load "fixtures/symmetric.jld2" fixtures
