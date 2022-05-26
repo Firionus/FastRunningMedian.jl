@@ -113,8 +113,8 @@ isfull(mf::MedianFilter) = mf.heap_pos |> DataStructures.isfull
 
 Grow mf with the new value `val`. 
 
-Returns the updated median. If mf would grow beyond
-maximum window size, an error is thrown. In this case you probably wanted to use [`roll!`](@ref). 
+If mf would grow beyond maximum window size, an error is thrown. In this case
+you probably wanted to use [`roll!`](@ref). 
 
 The new element is pushed onto the end of the circular buffer. 
 """
@@ -167,8 +167,7 @@ function grow!(mf::MedianFilter, val)
             mf.heap_pos[current_median[2] - mf.heap_pos_offset] = (false, pushed_handle)
         end
     end
-
-    return median(mf)
+    return
 end
 
 """
@@ -176,7 +175,7 @@ end
 
 Shrinks `mf` by removing the first and oldest element in the circular buffer. 
 
-Returns the updated median. Will error if mf contains only one element as a MedianFilter with zero elements
+Will error if mf contains only one element as a MedianFilter with zero elements
 would not have a median. 
 """
 function shrink!(mf::MedianFilter)
@@ -212,16 +211,17 @@ function shrink!(mf::MedianFilter)
             mf.heap_pos[current_median[2] - mf.heap_pos_offset] = to_remove
         end
     end
-
-    return median(mf)
+    return
 end
 
 """
     roll!(mf::MedianFilter, val)
 
-Roll the window over to the next position by replacing the first and oldest element in the ciruclar buffer with the new value `val`. 
+Roll the window over to the next position by replacing the first and oldest
+element in the ciruclar buffer with the new value `val`. 
 
-Will error when `mf` is not full yet - in this case you must first [`grow!`](@ref) mf to maximum capacity. 
+Will error when `mf` is not full yet - in this case you must first
+[`grow!`](@ref) mf to maximum capacity. 
 """
 function roll!(mf::MedianFilter, val)
     if !isfull(mf)
@@ -292,8 +292,7 @@ function roll!(mf::MedianFilter, val)
             end
         end
     end
-
-    return median(mf)
+    return
 end
 
 """
@@ -381,14 +380,16 @@ function symmetric_running_median(input::AbstractVector{T}, window_size::Integer
     while !isfull(mf)
         grow!(mf, input[i])
         i += 1
-        output[j] = grow!(mf, input[i])
+        grow!(mf, input[i])
+        output[j] = median(mf)
         i += 1
         j += 1
     end
 
     # roll phase
     while i <= N
-        output[j] = roll!(mf, input[i])
+        roll!(mf, input[i])
+        output[j] = median(mf)
         i += 1
         j += 1
     end
@@ -396,7 +397,8 @@ function symmetric_running_median(input::AbstractVector{T}, window_size::Integer
     # shrink phase
     while j <= N_out
         shrink!(mf)
-        output[j] = shrink!(mf)
+        shrink!(mf)
+        output[j] = median(mf)
         j += 1
     end
 
@@ -429,21 +431,24 @@ function asymmetric_running_median(input::AbstractVector{T}, window_size::Intege
 
     # grow phase
     while !isfull(mf)
-        output[j] = grow!(mf, input[i])
+        grow!(mf, input[i])
+        output[j] = median(mf)
         i += 1
         j += 1
     end
 
     # roll phase
     while i <= N
-        output[j] = roll!(mf, input[i])
+        roll!(mf, input[i])
+        output[j] = median(mf)
         i += 1
         j += 1
     end
 
     # shrink phase
     while j <= N_out
-        output[j] = shrink!(mf)
+        shrink!(mf)
+        output[j] = median(mf)
         j += 1
     end
 
@@ -486,21 +491,24 @@ function asymmetric_truncated_running_median(input::AbstractVector{T}, window_si
 
     # grow phase
     while !isfull(mf)
-        output[j] = grow!(mf, input[i])
+        grow!(mf, input[i])
+        output[j] = median(mf)
         i += 1
         j += 1
     end
 
     # roll phase
     while i <= N
-        output[j] = roll!(mf, input[i])
+        roll!(mf, input[i])
+        output[j] = median(mf)
         i += 1
         j += 1
     end
 
     # shrink phase
     while j <= N_out
-        output[j] = shrink!(mf)
+        shrink!(mf)
+        output[j] = median(mf)
         j += 1
     end
 
@@ -539,7 +547,8 @@ function untapered_running_median(input::AbstractVector{T}, window_size::Integer
 
     # roll phase
     while i <= N
-        output[j] = roll!(mf, input[i])
+        roll!(mf, input[i])
+        output[j] = median(mf)
         i += 1
         j += 1
     end

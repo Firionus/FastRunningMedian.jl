@@ -74,9 +74,9 @@ println("running tests...")
                 end
                 @assert length(mf) == window_size
                 for i in 1:length(roll_values)
-                    mf_median = roll!(mf, roll_values[i])
+                    roll!(mf, roll_values[i])
                     check_health(mf)
-                    @assert mf_median == expected_medians[i]
+                    @assert median(mf) == expected_medians[i]
                 end
             end
 
@@ -87,8 +87,10 @@ println("running tests...")
 
         @testset "Roll does work with window size 1" begin
             mf = MedianFilter(1., 1)
-            @test 2. == roll!(mf, 2.)
-            @test 1. == roll!(mf, 1.)
+            roll!(mf, 2.)
+            @test 2. == median(mf)
+            roll!(mf, 1.)
+            @test 1. == median(mf)
         end
     
         @testset "Grow! does not grow beyond capacity" begin
