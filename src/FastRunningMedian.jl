@@ -315,7 +315,7 @@ If you choose an even `window_size`, the elements of the output array lie in the
 
 The underlying algorithm should scale as O(N log w) with the input size N and the window_size w. 
 """
-function running_median(input::Array{T,1}, window_size::Integer, tapering=:symmetric) where T <: Real
+function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric) where T <: Real
     if length(input) == 0
         error("input array must be non-empty")
     end
@@ -339,7 +339,7 @@ function running_median(input::Array{T,1}, window_size::Integer, tapering=:symme
     end
 end
 
-function symmetric_running_median(input::Array{T,1}, window_size::Integer) where T <: Real
+function symmetric_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
     N = length(input)
 
     # calculate maximum possible window size
@@ -403,7 +403,7 @@ function symmetric_running_median(input::Array{T,1}, window_size::Integer) where
     return output
 end
 
-function asymmetric_running_median(input::Array{T,1}, window_size::Integer) where T <: Real
+function asymmetric_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
     N = length(input)
 
     # calculate maximum possible window size
@@ -450,7 +450,7 @@ function asymmetric_running_median(input::Array{T,1}, window_size::Integer) wher
     return output
 end
 
-function asymmetric_truncated_running_median(input::Array{T,1}, window_size::Integer) where T <: Real
+function asymmetric_truncated_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
     N = length(input)
 
     # calculate maximum possible window size
@@ -507,7 +507,7 @@ function asymmetric_truncated_running_median(input::Array{T,1}, window_size::Int
     return output
 end
 
-function untapered_running_median(input::Array{T,1}, window_size::Integer) where T <: Real
+function untapered_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
     N = length(input)
 
     # calculate maximum possible window size
