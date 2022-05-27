@@ -34,103 +34,88 @@ function running_median(input::AbstractVector{T}, window_size::Integer, tapering
         error("window_size must be 1 or bigger")
     end
 
-    if tapering == :symmetric || tapering == :sym
-        symmetric_running_median(input, window_size)
-    elseif tapering == :asymmetric || tapering == :asym
-        asymmetric_running_median(input, window_size)
-    elseif tapering == :asymmetric_truncated || tapering == :asym_trunc
-        asymmetric_truncated_running_median(input, window_size)
-    elseif tapering == :none || tapering == :no
-        untapered_running_median(input, window_size)
+    N = length(input)
+
+    # clamp window size to N
+    window_size = min(window_size, N)
+
+    if tapering in (:symmetric, :sym)
+        if N |> iseven
+            max_window_size = N-1
+            window_size = min(window_size, max_window_size)
+        end
+        N_out = window_size |> isodd ? N : N-1
+        prep = _prepare_running_median(input, window_size, N_out)
+        _symmetric_phases!(prep...)
+    elseif tapering in (:asymmetric, :asym)
+        N_out = N + window_size - 1
+        prep = _prepare_running_median(input, window_size, N_out)
+        _asymmetric_phases!(prep...)
+    elseif tapering in (:asymmetric_truncated, :asym_trunc)
+        N_out = window_size |> isodd ? N : N-1
+        prep = _prepare_running_median(input, window_size, N_out)
+        _asymmetric_truncated_phases!(prep...)
+    elseif tapering in (:none, :no)
+        N_out = N - window_size + 1
+        prep = _prepare_running_median(input, window_size, N_out)
+        _untapered_phases!(prep...)
     else
         error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
     end
+
+    return prep.output
 end
 
-function symmetric_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
-    N = length(input)
-
-    # calculate maximum possible window size
-    if N |> isodd
-        max_possible_window_size = N
-    else
-        max_possible_window_size = N - 1
-    end
-    # assign no value bigger than max_possible_window_size to not break circular buffer behaviour
-    if max_possible_window_size < window_size
-        window_size = max_possible_window_size
-    end
-
-    # allocate output
-    if window_size |> iseven
-        N_out = N - 1
-    else
-        N_out = N
-    end
-    output = Array{Float64,1}(undef, N_out)
-
+function _prepare_running_median(input, window_size, N_out)
     # input iterator
     it = Iterators.Stateful(input)
 
-    # construct MedianFilter
+    output = Array{Float64,1}(undef, N_out)
     mf = MedianFilter(popfirst!(it), window_size)
-
-    # if even, start with two elements in mf at index 1.5
-    if window_size |> iseven
-        grow!(mf, popfirst!(it))
-    end
-
-    # first median
-    j = 1
-    output[j] = median(mf)
-    j += 1
-
-    # grow phase
-    while !isfull(mf)
-        grow!(mf, popfirst!(it))
-        grow!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
-    end
-
-    # roll phase
-    while !isdone(it)
-        roll!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
-    end
-
-    # shrink phase
-    while j <= N_out
-        shrink!(mf)
-        shrink!(mf)
-        output[j] = median(mf)
-        j += 1
-    end
-
-    return output
-end
-
-function asymmetric_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
-    N = length(input)
-
-    # calculate maximum possible window size
-    max_possible_window_size = N
-    # assign no value bigger than max_possible_window_size to not break circular buffer behaviour
-    if max_possible_window_size < window_size
-        window_size = max_possible_window_size
-    end
     
-    # allocate output
-    N_out = N + window_size - 1
-    output = Array{Float64,1}(undef, N_out)
+    return (
+        it = it,
+        mf = mf,
+        output = output,
+    )
+end
 
-    # input iterator
-    it = Iterators.Stateful(input)
+function _symmetric_phases!(it, mf, output)
+    # if even, start with two elements in mf at index 1.5
+    if window_size(mf) |> iseven
+        grow!(mf, popfirst!(it))
+    end
 
-    # construct MedianFilter
-    mf = MedianFilter(popfirst!(it), window_size)
+    # first median
+    j = 1
+    output[j] = median(mf)
+    j += 1
 
+    # grow phase
+    while !isfull(mf)
+        grow!(mf, popfirst!(it))
+        grow!(mf, popfirst!(it))
+        output[j] = median(mf)
+        j += 1
+    end
+
+    # roll phase
+    while !isdone(it)
+        roll!(mf, popfirst!(it))
+        output[j] = median(mf)
+        j += 1
+    end
+
+    # shrink phase
+    while j <= length(output)
+        shrink!(mf)
+        shrink!(mf)
+        output[j] = median(mf)
+        j += 1
+    end
+end
+
+function _asymmetric_phases!(it, mf, output)
     # first median
     j = 1
     output[j] = median(mf)
@@ -151,41 +136,16 @@ function asymmetric_running_median(input::AbstractVector{T}, window_size::Intege
     end
 
     # shrink phase
-    while j <= N_out
+    while j <= length(output)
         shrink!(mf)
         output[j] = median(mf)
         j += 1
     end
-
-    return output
 end
 
-function asymmetric_truncated_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
-    N = length(input)
-
-    # calculate maximum possible window size
-    max_possible_window_size = N
-    # assign no value bigger than max_possible_window_size to not break circular buffer behaviour
-    if max_possible_window_size < window_size
-        window_size = max_possible_window_size
-    end
-
-    # allocate output
-    if window_size |> iseven
-        N_out = N - 1
-    else
-        N_out = N
-    end
-    output = Array{Float64,1}(undef, N_out)
-
-    # input iterator
-    it = Iterators.Stateful(input)
-
-    # construct MedianFilter
-    mf = MedianFilter(popfirst!(it), window_size)
-
+function _asymmetric_truncated_phases!(it, mf, output)
     # pre-output grow phase
-    while length(mf) <= window_size / 2
+    while length(mf) <= window_size(mf) / 2
         grow!(mf, popfirst!(it))
     end
 
@@ -209,35 +169,14 @@ function asymmetric_truncated_running_median(input::AbstractVector{T}, window_si
     end
 
     # shrink phase
-    while j <= N_out
+    while j <= length(output)
         shrink!(mf)
         output[j] = median(mf)
         j += 1
     end
-
-    return output
 end
 
-function untapered_running_median(input::AbstractVector{T}, window_size::Integer) where T <: Real
-    N = length(input)
-
-    # calculate maximum possible window size
-    max_possible_window_size = N
-    # assign no value bigger than max_possible_window_size to not break circular buffer behaviour
-    if max_possible_window_size < window_size
-        window_size = max_possible_window_size
-    end
-
-    # allocate output
-    N_out = N - window_size + 1
-    output = Array{Float64,1}(undef, N_out)
-
-    # input iterator
-    it = Iterators.Stateful(input)
-
-    # construct MedianFilter
-    mf = MedianFilter(popfirst!(it), window_size)
-
+function _untapered_phases!(it, mf, output)
     # grow phase - no output yet
     while !isfull(mf)
         grow!(mf, popfirst!(it))
@@ -254,8 +193,6 @@ function untapered_running_median(input::AbstractVector{T}, window_size::Integer
         output[j] = median(mf)
         j += 1
     end
-
-    return output
 end
 
 end # module
