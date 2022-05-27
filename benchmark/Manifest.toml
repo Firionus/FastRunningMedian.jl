@@ -1,5 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
+julia_version = "1.7.2"
 manifest_format = "2.0"
 
 [[deps.ArgTools]]
@@ -126,9 +127,7 @@ version = "0.6.8"
 
 [[deps.FastRunningMedian]]
 deps = ["DataStructures"]
-git-tree-sha1 = "ad4c27b6526701c61c09772c4b7266f87b43a05d"
-repo-rev = "master"
-repo-url = "https://github.com/Firionus/FastRunningMedian.jl"
+path = ".."
 uuid = "3a47ddbd-112b-4cc1-b00e-3746ec434ee5"
 version = "0.1.0"
 
@@ -392,11 +391,9 @@ uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
 
 [[deps.SortFilters]]
 deps = ["Statistics"]
-git-tree-sha1 = "f82c2d3389d23fb45c31716cd5f896a375a928d0"
-repo-rev = "master"
-repo-url = "https://github.com/sairus7/SortFilters.jl.git"
+git-tree-sha1 = "78c26593c42e33f707e15816eedc380d59ea7687"
 uuid = "d6dedbf8-78c7-4e81-bd5f-fe48695b798a"
-version = "0.1.1"
+version = "0.1.0"
 
 [[deps.SortingAlgorithms]]
 deps = ["DataStructures"]
