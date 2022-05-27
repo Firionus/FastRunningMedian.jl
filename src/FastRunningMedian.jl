@@ -25,7 +25,7 @@ If you choose an even `window_size`, the elements of the output array lie in the
 
 The underlying algorithm should scale as O(N log w) with the input size N and the window_size w. 
 """
-function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric) where T <: Real
+function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric) where {T<:Real}
     if length(input) == 0
         error("input array must be non-empty")
     end
@@ -41,10 +41,10 @@ function running_median(input::AbstractVector{T}, window_size::Integer, tapering
 
     if tapering in (:symmetric, :sym)
         if N |> iseven
-            max_window_size = N-1
+            max_window_size = N - 1
             window_size = min(window_size, max_window_size)
         end
-        N_out = window_size |> isodd ? N : N-1
+        N_out = window_size |> isodd ? N : N - 1
         prep = _prepare_running_median(input, window_size, N_out)
         _symmetric_phases!(prep...)
     elseif tapering in (:asymmetric, :asym)
@@ -52,7 +52,7 @@ function running_median(input::AbstractVector{T}, window_size::Integer, tapering
         prep = _prepare_running_median(input, window_size, N_out)
         _asymmetric_phases!(prep...)
     elseif tapering in (:asymmetric_truncated, :asym_trunc)
-        N_out = window_size |> isodd ? N : N-1
+        N_out = window_size |> isodd ? N : N - 1
         prep = _prepare_running_median(input, window_size, N_out)
         _asymmetric_truncated_phases!(prep...)
     elseif tapering in (:none, :no)
@@ -75,12 +75,12 @@ function _prepare_running_median(input, window_size, N_out)
 
     # output index iterator
     outindit = Iterators.Stateful(eachindex(output))
-    
+
     return (
-        init = init,
-        mf = mf,
-        output = output,
-        outindit = outindit,
+        init=init,
+        mf=mf,
+        output=output,
+        outindit=outindit,
     )
 end
 
@@ -170,7 +170,7 @@ function _untapered_phases!(init, mf, output, outindit)
     while !isfull(mf)
         grow!(mf, popfirst!(init))
     end
-    
+
     # first median
     output[popfirst!(outindit)] = median(mf)
 

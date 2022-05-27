@@ -11,7 +11,7 @@ Base.lt(o::TupleReverse, a, b) = a[1] > b[1]
 
 # Main struct in this package - provides state for stateful median calculation
 mutable struct MedianFilter{T}
-    low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse} 
+    low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse}
     high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward}
     # first tuple value is data, second tuple value is index in heap_pos (see heap_pos_offset!)
 
@@ -26,10 +26,10 @@ mutable struct MedianFilter{T}
     # This is why index_in_heap_pos = heap_pos_indices_in_heaps - heap_pos_offset
 
     # Inner constructor to enforce T <: Real
-    function MedianFilter(low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse}, 
-        high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward}, 
-        heap_pos::CircularBuffer{Tuple{Bool,Int}}, 
-        heap_pos_offset::Int) where T <: Real
+    function MedianFilter(low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse},
+        high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward},
+        heap_pos::CircularBuffer{Tuple{Bool,Int}},
+        heap_pos_offset::Int) where {T<:Real}
         return new{T}(low_heap, high_heap, heap_pos, heap_pos_offset)
     end
 end
@@ -42,15 +42,15 @@ Construct a stateful running median filter.
 Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref). 
 Query with [`median`](@ref), [`length`](@ref), [`window_size`](@ref), [`isfull`](@ref). 
 """
-function MedianFilter(first_val::T, window_size::Int) where T <: Real
+function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
     low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
     high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
     heap_positions = CircularBuffer{Tuple{Bool,Int}}(window_size)
-    
+
     first_val_ind = push!(low_heap, (first_val, 1))
-    
+
     push!(heap_positions, (true, first_val_ind))
-    
+
     MedianFilter(low_heap, high_heap, heap_positions, 0)
 end
 
@@ -133,12 +133,12 @@ function grow!(mf::MedianFilter, val)
 
             # push new val to end of circular buffer an onto high_heap where it replaces to_displace
             push!(mf.heap_pos, mf.heap_pos[middle_high[2]])
-            update!(mf.high_heap, mf.heap_pos[middle_high[2] - mf.heap_pos_offset][2], 
+            update!(mf.high_heap, mf.heap_pos[middle_high[2]-mf.heap_pos_offset][2],
                 (val, length(mf.heap_pos) + mf.heap_pos_offset))
             # move middle_high onto low_heap
             pushed_handle = push!(mf.low_heap, middle_high)
             # update heap_pos
-            mf.heap_pos[middle_high[2] - mf.heap_pos_offset] = (true, pushed_handle)
+            mf.heap_pos[middle_high[2]-mf.heap_pos_offset] = (true, pushed_handle)
         end
     else
         # odd number of elements
@@ -154,12 +154,12 @@ function grow!(mf::MedianFilter, val)
 
             # push new val to end of circular buffer and onto low_heap where it replaces current_median
             push!(mf.heap_pos, mf.heap_pos[current_median[2]])
-            update!(mf.low_heap, mf.heap_pos[current_median[2] - mf.heap_pos_offset][2], 
+            update!(mf.low_heap, mf.heap_pos[current_median[2]-mf.heap_pos_offset][2],
                 (val, length(mf.heap_pos) + mf.heap_pos_offset))
             # move current_median onto high_heap
             pushed_handle = push!(mf.high_heap, current_median)
             # update heap_pos
-            mf.heap_pos[current_median[2] - mf.heap_pos_offset] = (false, pushed_handle)
+            mf.heap_pos[current_median[2]-mf.heap_pos_offset] = (false, pushed_handle)
         end
     end
     return
@@ -188,7 +188,7 @@ function shrink!(mf::MedianFilter)
             # element-to-remove is in low_heap
             medium_high = pop!(mf.high_heap)
             update!(mf.low_heap, to_remove[2], medium_high)
-            mf.heap_pos[medium_high[2] - mf.heap_pos_offset] = to_remove
+            mf.heap_pos[medium_high[2]-mf.heap_pos_offset] = to_remove
         else
             # element-to-remove is in high_heap
             delete!(mf.high_heap, to_remove[2])
@@ -203,7 +203,7 @@ function shrink!(mf::MedianFilter)
             # element-to-remove is in high_heap
             current_median = pop!(mf.low_heap)
             update!(mf.high_heap, to_remove[2], current_median)
-            mf.heap_pos[current_median[2] - mf.heap_pos_offset] = to_remove
+            mf.heap_pos[current_median[2]-mf.heap_pos_offset] = to_remove
         end
     end
     return
@@ -244,7 +244,7 @@ function roll!(mf::MedianFilter, val)
                 # shift low_top into hole in high_heap
                 update!(mf.high_heap, to_replace[2], low_top)
                 # don't forget to update indices in heap_pos
-                mf.heap_pos[low_top[2] - mf.heap_pos_offset] = (false, to_replace[2])
+                mf.heap_pos[low_top[2]-mf.heap_pos_offset] = (false, to_replace[2])
                 # put new val where low_top is
                 update!(mf.low_heap, low_top_ind, new_heap_element)
                 # perform circular push on circular buffer
@@ -259,7 +259,7 @@ function roll!(mf::MedianFilter, val)
                 # shift high_top into hole in low_heap
                 update!(mf.low_heap, to_replace[2], high_top)
                 # dont't forget to udpate indices in heap_pos
-                mf.heap_pos[high_top[2] - mf.heap_pos_offset] = (true, to_replace[2])
+                mf.heap_pos[high_top[2]-mf.heap_pos_offset] = (true, to_replace[2])
                 # put new val where high_top is
                 update!(mf.high_heap, high_top_ind, new_heap_element)
                 # perform circular push on circular buffer
