@@ -68,130 +68,116 @@ end
 
 function _prepare_running_median(input, window_size, N_out)
     # input iterator
-    it = Iterators.Stateful(input)
+    init = Iterators.Stateful(input)
 
     output = Array{Float64,1}(undef, N_out)
-    mf = MedianFilter(popfirst!(it), window_size)
+    mf = MedianFilter(popfirst!(init), window_size)
+
+    # output index iterator
+    outindit = Iterators.Stateful(eachindex(output))
     
     return (
-        it = it,
+        init = init,
         mf = mf,
         output = output,
+        outindit = outindit,
     )
 end
 
-function _symmetric_phases!(it, mf, output)
+function _symmetric_phases!(init, mf, output, outindit)
     # if even, start with two elements in mf at index 1.5
     if window_size(mf) |> iseven
-        grow!(mf, popfirst!(it))
+        grow!(mf, popfirst!(init))
     end
 
     # first median
-    j = 1
-    output[j] = median(mf)
-    j += 1
+    output[popfirst!(outindit)] = median(mf)
 
     # grow phase
     while !isfull(mf)
-        grow!(mf, popfirst!(it))
-        grow!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
+        grow!(mf, popfirst!(init))
+        grow!(mf, popfirst!(init))
+        output[popfirst!(outindit)] = median(mf)
     end
 
     # roll phase
-    while !isdone(it)
-        roll!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
+    while !isdone(init)
+        roll!(mf, popfirst!(init))
+        output[popfirst!(outindit)] = median(mf)
     end
 
     # shrink phase
-    while j <= length(output)
+    while !isdone(outindit)
         shrink!(mf)
         shrink!(mf)
-        output[j] = median(mf)
-        j += 1
+        output[popfirst!(outindit)] = median(mf)
     end
 end
 
-function _asymmetric_phases!(it, mf, output)
+function _asymmetric_phases!(init, mf, output, outindit)
     # first median
-    j = 1
-    output[j] = median(mf)
-    j += 1
+    output[popfirst!(outindit)] = median(mf)
 
     # grow phase
     while !isfull(mf)
-        grow!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
+        grow!(mf, popfirst!(init))
+        output[popfirst!(outindit)] = median(mf)
     end
 
     # roll phase
-    while !isdone(it)
-        roll!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
+    while !isdone(init)
+        roll!(mf, popfirst!(init))
+        output[popfirst!(outindit)] = median(mf)
     end
 
     # shrink phase
-    while j <= length(output)
+    while !isdone(outindit)
         shrink!(mf)
-        output[j] = median(mf)
-        j += 1
+        output[popfirst!(outindit)] = median(mf)
     end
 end
 
-function _asymmetric_truncated_phases!(it, mf, output)
+function _asymmetric_truncated_phases!(init, mf, output, outindit)
     # pre-output grow phase
     while length(mf) <= window_size(mf) / 2
-        grow!(mf, popfirst!(it))
+        grow!(mf, popfirst!(init))
     end
 
     # first median
-    j = 1
-    output[j] = median(mf)
-    j += 1
+    output[popfirst!(outindit)] = median(mf)
 
     # grow phase
     while !isfull(mf)
-        grow!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
+        grow!(mf, popfirst!(init))
+        output[popfirst!(outindit)] = median(mf)
     end
 
     # roll phase
-    while !isdone(it)
-        roll!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
+    while !isdone(init)
+        roll!(mf, popfirst!(init))
+        output[popfirst!(outindit)] = median(mf)
     end
 
     # shrink phase
-    while j <= length(output)
+    while !isdone(outindit)
         shrink!(mf)
-        output[j] = median(mf)
-        j += 1
+        output[popfirst!(outindit)] = median(mf)
     end
 end
 
-function _untapered_phases!(it, mf, output)
+function _untapered_phases!(init, mf, output, outindit)
     # grow phase - no output yet
     while !isfull(mf)
-        grow!(mf, popfirst!(it))
+        grow!(mf, popfirst!(init))
     end
     
     # first median
-    j = 1
-    output[j] = median(mf)
-    j += 1
+    output[popfirst!(outindit)] = median(mf)
 
     # roll phase
-    while !isdone(it)
-        roll!(mf, popfirst!(it))
-        output[j] = median(mf)
-        j += 1
+    while !isdone(init)
+        roll!(mf, popfirst!(init))
+        output[popfirst!(outindit)] = median(mf)
     end
 end
 
