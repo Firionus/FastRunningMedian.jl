@@ -207,4 +207,10 @@ println("running tests...")
         end
         
     end
+
+    @testset "Aqua - Auto Quality Assurance" begin
+        using Aqua
+        Aqua.test_all(FastRunningMedian)
+    end
+    
 end # all tests
