@@ -200,6 +200,11 @@ println("running tests...")
                 @test fixture[3] == running_median(fixture[1], fixture[2], :asym_trunc)
             end
         end
+
+        @testset "Check views into arrays can be handled" begin
+            data, window = collect(1:10), 3
+            @test running_median(@view(data[2:end]), window) == running_median(data[2:end], window)
+        end
         
     end
 end # all tests
