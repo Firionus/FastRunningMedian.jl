@@ -160,10 +160,24 @@ end
 
 # TODO this approach needs more documentation and strong ties into the algorithm code
 """
-conditions that need to hold for lower and upper to be valid:
+conditions that need to hold for lower and upper to be valid (winsize even)
     count(x -> x < lower, window) < length(window)/2
     &&
+    count(x -> x > lower, window) <= length(window)/2
+    &&
     count(x -> x > upper, window) < length(window)/2
+    &&
+    count(x -> x < upper, window) <= length(window)/2
+    
+
+    For a single median (odd winsize), these two conditions are sufficient to define it as median:
+    count(x -> x < median, window) < length(window)/2
+    &&
+    count(x -> x > median, window) < length(window)/2
+
+    Because if median is chosen too high, the count of elements lower than it would 
+    be too large (execept for the cases where it doesn't matter :)). If the median 
+    is chosen too low, the number of elements higher than it would be too large. 
 """
 
 function shrink!(mf::PivotCountingState, window, yout)
@@ -178,6 +192,7 @@ function shrink!(mf::PivotCountingState, window, yout)
         elements_smaller_prev_med = 0
         next_highest = Inf
         next_smaller = -Inf
+        # TODO possible logic error here because we only check 2 conditions instead of all 4
         for el in window
             if el > mf.lower
                 elements_bigger_prev_med += 1
