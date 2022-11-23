@@ -11,7 +11,7 @@ above the old median, I will call the approach "pivot counting".
 To explain the "pivot counting" approach, we first define the median of an
 iterable `window``.
 
-If `length(window)|>iseven``, then the median is a value that satisfies:
+If `length(window)|>isodd``, then the median is a value that satisfies:
 
     median in window &&
     count(x -> x < median, window) < length(window)/2 &&
@@ -21,10 +21,10 @@ This holds intuitively, because if median is chosen too high, the count of
 elements lower than it would be too large. If the median is chosen too low, the
 number of elements higher than it would be too large. 
 
-If `lenth(window)|>isodd`, the median is defined by two values `lower` and 
+If `length(window)|>iseven`, the median is defined by two values `lower` and 
 `upper` that satisfy:
+# TODO rename upper to higher?
 
-    lower <= upper && # TODO redundant?
     lower in window &&
     upper in window &&
     count(x -> x < lower, window) < length(window)/2 && 
@@ -32,7 +32,12 @@ If `lenth(window)|>isodd`, the median is defined by two values `lower` and
     count(x -> x > upper, window) < length(window)/2 && 
     count(x -> x < upper, window) <= length(window)/2
     
-TODO intuitive explanation
+Intuitively, if lower is chosen too high, the elements below it would be at
+least half of the elements. If lower is chosen too low, the elements above it
+would be more than half the elements.  
+If upper is chosen too low, the elements above it are at least half of the
+elements. If upper is chosen too high, the elements smaller than it are more
+than half the elements.
 """
 
 mutable struct PivotCountingState
@@ -104,13 +109,17 @@ function grow!(mf::PivotCountingState, window, yin)
         if yin < mf.lower
             # previous median becomes upper
             mf.upper = mf.lower
+            # new lower might have to be lower, check if it does:
+            mf.lower = pivot_count_lower(window, mf.lower)
             # new lower value is hard to find
-            mf.lower = find_lower(window) # TODO not sure if we can speed this up
+            # mf.lower = find_lower(window) # TODO not sure if we can speed this up
             # TODO calling this repeatedly might be slow compared to keeping a sorted array, heaps or skiplist and updating it
         elseif yin > mf.lower
             # previous median stays lower
+            # new upper might have to be bigger
+            mf.upper = pivot_count_upper(window, mf.lower)
             # new upper value is hard to find
-            mf.upper = find_upper(window) # TODO not sure if we can speed this up
+            # mf.upper = find_upper(window) # TODO not sure if we can speed this up
             # TODO same performance problem as above
         else # yin == mf.lower
             # "nothing" to do, median does not change
@@ -118,18 +127,6 @@ function grow!(mf::PivotCountingState, window, yin)
         end
     end
     mf.winsize += 1
-end
-
-function find_lower(window) 
-    @assert length(window) |> iseven
-    lower_sorted_ind = Int(length(window)/2)
-    partialsort(window, lower_sorted_ind)
-end
-
-function find_upper(window) 
-    @assert length(window) |> iseven
-    upper_sorted_ind = Int(length(window)/2) + 1
-    partialsort(window, upper_sorted_ind)
 end
 
 function roll!(mf::PivotCountingState, yout, window, yin)
@@ -172,16 +169,22 @@ function roll!(mf::PivotCountingState, yout, window, yin)
             # TODO this if structure might be able to be arranged more nicely
             if yout >= mf.upper
                 mf.upper = mf.lower
-                mf.lower = find_lower(window) # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
+                # check if one condition for lower still holds, otherwise it is too big and we use next smaller one
+                mf.lower = pivot_count_lower(window, mf.lower)
+                # mf.lower = find_lower(window) # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
             elseif yout == mf.lower
-                mf.lower = find_lower(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
+                mf.lower = pivot_count_lower(window, mf.lower)
+                # mf.lower = find_lower(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
             end # nothing in case yout < a, since it's a "deep replacement", not affecting lower/upper/median
         elseif yin > mf.upper
             if yout <= mf.lower
                 mf.lower = mf.upper
-                mf.upper = find_upper(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
+                # check if upper should be bigger, if it is use next bigger one
+                mf.upper = pivot_count_upper(window, mf.upper)
+                # mf.upper = find_upper(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
             elseif yout == mf.upper
-                mf.upper = find_upper(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window (check if condition holds for old value, otherwise switch to next one)
+                mf.upper = pivot_count_upper(window, mf.upper)
+                # mf.upper = find_upper(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window (check if condition holds for old value, otherwise switch to next one)
             end # else nothing as it's a deep replacement
         else # yin is in [lower; upper] (inclusive)
             if yout <= mf.lower
@@ -190,6 +193,42 @@ function roll!(mf::PivotCountingState, yout, window, yin)
                 mf.upper = yin
             end
         end
+    end
+end
+
+function pivot_count_upper(window, prev_upper)
+    count = 0
+    next_highest = Inf # TODO I don't know if this all that elegant
+    for el in window
+        if el > prev_upper
+            count += 1
+            if el < next_highest
+                next_highest = el
+            end
+        end
+    end
+    if count < length(window)/2 # condition holds
+        prev_upper
+    else # condition broken, move to next higher element
+        next_highest
+    end
+end
+
+function pivot_count_lower(window, prev_lower)
+    count = 0
+    next_smaller = -Inf # TODO I don't know if this all that elegant
+    for el in window
+        if el < prev_lower # TODO some testing with long arrays and high equality might be a good idea to assert everything is right here, e.g. on rand(1:3, 10^6) or rand(1:2, 10^6)
+            count += 1
+            if el > next_smaller
+                next_smaller = el
+            end
+        end
+    end
+    if count < length(window)/2 #condition holds
+        prev_lower
+    else # condition broken, move one element down
+        next_smaller
     end
 end
 
@@ -264,14 +303,6 @@ end
     # mf.upper shall not be accessed when winsize is odd and its value does not matter
     @test mf.winsize == 3
     @test median(mf) === 1.
-end
-
-@testset "find_lower and find_upper" begin
-    @test find_lower([5,3,5,1]) == 3
-    @test find_upper([5,3,5,1]) == 5
-
-    @test find_lower([1,2,3,4]) == 2
-    @test find_upper([1,2,3,4]) == 3
 end
 
 @testset "roll!" begin
