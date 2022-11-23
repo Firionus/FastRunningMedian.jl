@@ -23,7 +23,6 @@ number of elements higher than it would be too large.
 
 If `length(window)|>iseven`, the median is defined by two values `lower` and 
 `upper` that satisfy:
-# TODO rename upper to higher?
 
     lower in window &&
     upper in window &&
@@ -38,6 +37,8 @@ would be more than half the elements.
 If upper is chosen too low, the elements above it are at least half of the
 elements. If upper is chosen too high, the elements smaller than it are more
 than half the elements.
+
+TODO place closer to pivot_count functions and link with their logic more deeply
 """
 
 mutable struct PivotCountingState
@@ -107,20 +108,11 @@ function grow!(mf::PivotCountingState, window, yin)
     # grow odd -> even
     else # mf |> isodd
         if yin < mf.lower
-            # previous median becomes upper
-            mf.upper = mf.lower
-            # new lower might have to be lower, check if it does:
-            mf.lower = pivot_count_lower(window, mf.lower)
-            # new lower value is hard to find
-            # mf.lower = find_lower(window) # TODO not sure if we can speed this up
-            # TODO calling this repeatedly might be slow compared to keeping a sorted array, heaps or skiplist and updating it
+            mf.upper = mf.lower # previous median becomes upper
+            mf.lower = pivot_count_down(window, mf.lower)
         elseif yin > mf.lower
             # previous median stays lower
-            # new upper might have to be bigger
-            mf.upper = pivot_count_upper(window, mf.lower)
-            # new upper value is hard to find
-            # mf.upper = find_upper(window) # TODO not sure if we can speed this up
-            # TODO same performance problem as above
+            mf.upper = pivot_count_up(window, mf.lower)
         else # yin == mf.lower
             # "nothing" to do, median does not change
             mf.upper = mf.yin
@@ -134,57 +126,25 @@ function roll!(mf::PivotCountingState, yout, window, yin)
     @assert yout <= mf.lower || yout >= mf.upper # yout can't be between lower and upper
     if mf |> isodd 
         if yin > mf.lower && yout <= mf.lower
-            # median might shift up, count to see if it will and also collect next highest element
-            count = 0
-            next_highest = Inf # TODO I don't know if this all that elegant
-            for el in window
-                if el > mf.lower
-                    count += 1
-                    if el < next_highest
-                        next_highest = el
-                    end
-                end
-            end
-            if count > mf.winsize/2
-                mf.lower = next_highest
-            end
+            mf.lower = pivot_count_up(window, mf.lower)
         elseif yin < mf.lower && yout >= mf.lower
-            # median might shift down, count to see if it will and also collect next smallest element
-            count = 0
-            next_smaller = -Inf # TODO I don't know if this all that elegant
-            for el in window
-                if el < mf.lower # TODO some testing with long arrays and high equality might be a good idea to assert everything is right here, e.g. on rand(1:3, 10^6) or rand(1:2, 10^6)
-                    count += 1
-                    if el > next_smaller
-                        next_smaller = el
-                    end
-                end
-            end
-            if count > mf.winsize/2
-                mf.lower = next_smaller
-            end
+            mf.lower = pivot_count_down(window, mf.lower)
         end
     else # mf |> iseven
         if yin < mf.lower
             # TODO this if structure might be able to be arranged more nicely
             if yout >= mf.upper
                 mf.upper = mf.lower
-                # check if one condition for lower still holds, otherwise it is too big and we use next smaller one
-                mf.lower = pivot_count_lower(window, mf.lower)
-                # mf.lower = find_lower(window) # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
+                mf.lower = pivot_count_down(window, mf.lower)
             elseif yout == mf.lower
-                mf.lower = pivot_count_lower(window, mf.lower)
-                # mf.lower = find_lower(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
+                mf.lower = pivot_count_down(window, mf.lower)
             end # nothing in case yout < a, since it's a "deep replacement", not affecting lower/upper/median
         elseif yin > mf.upper
             if yout <= mf.lower
                 mf.lower = mf.upper
-                # check if upper should be bigger, if it is use next bigger one
-                mf.upper = pivot_count_upper(window, mf.upper)
-                # mf.upper = find_upper(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window
+                mf.upper = pivot_count_up(window, mf.upper)
             elseif yout == mf.upper
-                mf.upper = pivot_count_upper(window, mf.upper)
-                # mf.upper = find_upper(window)  # TODO we can definitely speed this up somewhat by doing pivot counting like for odd window (check if condition holds for old value, otherwise switch to next one)
+                mf.upper = pivot_count_up(window, mf.upper)
             end # else nothing as it's a deep replacement
         else # yin is in [lower; upper] (inclusive)
             if yout <= mf.lower
@@ -196,11 +156,15 @@ function roll!(mf::PivotCountingState, yout, window, yin)
     end
 end
 
-function pivot_count_upper(window, prev_upper)
+"""
+Use when pivot might have to go up
+"""
+function pivot_count_up(window, prev)
     count = 0
     next_highest = Inf # TODO I don't know if this all that elegant
+    # TODO test what happens with windows of size 2, do we get some Inf's sometimes?
     for el in window
-        if el > prev_upper
+        if el > prev
             count += 1
             if el < next_highest
                 next_highest = el
@@ -208,17 +172,20 @@ function pivot_count_upper(window, prev_upper)
         end
     end
     if count < length(window)/2 # condition holds
-        prev_upper
+        prev
     else # condition broken, move to next higher element
         next_highest
     end
 end
 
-function pivot_count_lower(window, prev_lower)
+"""
+Use when pivot might have to go down
+"""
+function pivot_count_down(window, prev)
     count = 0
     next_smaller = -Inf # TODO I don't know if this all that elegant
     for el in window
-        if el < prev_lower # TODO some testing with long arrays and high equality might be a good idea to assert everything is right here, e.g. on rand(1:3, 10^6) or rand(1:2, 10^6)
+        if el < prev
             count += 1
             if el > next_smaller
                 next_smaller = el
@@ -226,7 +193,7 @@ function pivot_count_lower(window, prev_lower)
         end
     end
     if count < length(window)/2 #condition holds
-        prev_lower
+        prev
     else # condition broken, move one element down
         next_smaller
     end
@@ -240,33 +207,8 @@ function shrink!(mf::PivotCountingState, window, yout)
         end # else lower becomes median and stays lower
     #shrink odd -> even
     else # mf |> isodd
-        elements_bigger_prev_med = 0
-        elements_smaller_prev_med = 0
-        next_highest = Inf
-        next_smaller = -Inf
-        # TODO possible logic error here because we only check 2 conditions instead of all 4?
-        for el in window
-            if el > mf.lower
-                elements_bigger_prev_med += 1
-                if el < next_highest
-                    next_highest = el
-                end
-            end
-            if el < mf.lower
-                elements_smaller_prev_med += 1
-                if el > next_smaller
-                    next_smaller = el
-                end
-            end
-        end
-        if elements_bigger_prev_med >= length(window)/2
-            mf.upper = next_highest
-        else
-            mf.upper = mf.lower
-        end
-        if elements_smaller_prev_med >= length(window)/2
-            mf.lower = next_smaller
-        end
+        mf.upper = pivot_count_up(window, mf.lower)
+        mf.lower = pivot_count_down(window, mf.lower)
     end
     mf.winsize -= 1
 end
