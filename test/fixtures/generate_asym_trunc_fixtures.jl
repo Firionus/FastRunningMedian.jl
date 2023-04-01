@@ -1,6 +1,6 @@
 # please instantiate ./test/Manifest.toml for this
 
-using JLD2, RollingFunctions
+using JLD2
 import Statistics
 
 # ========================================

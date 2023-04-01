@@ -201,6 +201,20 @@ println("running tests...")
             end
         end
 
+        @testset "NaN should be included and turn whole window NaN by default" begin
+            @load "fixtures/asymmetric_includenan.jld2" fixtures
+            for fixture in fixtures
+                @test fixture[3] == running_median(fixture[1], fixture[2], :asym)
+            end
+        end
+
+        @testset "Ignore NaN on demand" begin
+            @load "fixtures/asymmetric_ignorenan.jld2" fixtures
+            for fixture in fixtures
+                @test fixture[3] == running_median(fixture[1], fixture[2], :asym, nan=:ignore)
+            end
+        end
+
         @testset "Check views into arrays can be handled" begin
             data, window = collect(1:10), 3
             @test running_median(@view(data[2:end]), window) == running_median(data[2:end], window)

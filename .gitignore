@@ -2,3 +2,4 @@ docs/build
 *checkpoint.ipynb
 *.ipynb_checkpoints
 Manifest.toml
+.vscode
