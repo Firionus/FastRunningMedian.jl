@@ -25,7 +25,7 @@ If you choose an even `window_size`, the elements of the output array lie in the
 
 The underlying algorithm should scale as O(N log w) with the input size N and the window_size w. 
 """
-function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric) where {T<:Real}
+function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric; nan=:include) where {T<:Real}
     if length(input) == 0
         error("input array must be non-empty")
     end
@@ -46,19 +46,19 @@ function running_median(input::AbstractVector{T}, window_size::Integer, tapering
         end
         N_out = window_size |> isodd ? N : N - 1
         prep = _prepare_running_median(input, window_size, N_out)
-        _symmetric_phases!(prep...)
+        _symmetric_phases!(prep..., nan)
     elseif tapering in (:asymmetric, :asym)
         N_out = N + window_size - 1
         prep = _prepare_running_median(input, window_size, N_out)
-        _asymmetric_phases!(prep...)
+        _asymmetric_phases!(prep..., nan)
     elseif tapering in (:asymmetric_truncated, :asym_trunc)
         N_out = window_size |> isodd ? N : N - 1
         prep = _prepare_running_median(input, window_size, N_out)
-        _asymmetric_truncated_phases!(prep...)
+        _asymmetric_truncated_phases!(prep..., nan)
     elseif tapering in (:none, :no)
         N_out = N - window_size + 1
         prep = _prepare_running_median(input, window_size, N_out)
-        _untapered_phases!(prep...)
+        _untapered_phases!(prep..., nan)
     else
         error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
     end
@@ -84,100 +84,100 @@ function _prepare_running_median(input, window_size, N_out)
     )
 end
 
-function _symmetric_phases!(init, mf, output, outindit)
+function _symmetric_phases!(init, mf, output, outindit, nan)
     # if even, start with two elements in mf at index 1.5
     if window_size(mf) |> iseven
         grow!(mf, popfirst!(init))
     end
 
     # first median
-    output[popfirst!(outindit)] = median(mf)
+    output[popfirst!(outindit)] = median(mf, nan=nan)
 
     # grow phase
     while !isfull(mf)
         grow!(mf, popfirst!(init))
         grow!(mf, popfirst!(init))
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 
     # roll phase
     while !isdone(init)
         roll!(mf, popfirst!(init))
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 
     # shrink phase
     while !isdone(outindit)
         shrink!(mf)
         shrink!(mf)
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 end
 
-function _asymmetric_phases!(init, mf, output, outindit)
+function _asymmetric_phases!(init, mf, output, outindit, nan)
     # first median
-    output[popfirst!(outindit)] = median(mf)
+    output[popfirst!(outindit)] = median(mf, nan=nan)
 
     # grow phase
     while !isfull(mf)
         grow!(mf, popfirst!(init))
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 
     # roll phase
     while !isdone(init)
         roll!(mf, popfirst!(init))
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 
     # shrink phase
     while !isdone(outindit)
         shrink!(mf)
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 end
 
-function _asymmetric_truncated_phases!(init, mf, output, outindit)
+function _asymmetric_truncated_phases!(init, mf, output, outindit, nan)
     # pre-output grow phase
     while length(mf) <= window_size(mf) / 2
         grow!(mf, popfirst!(init))
     end
 
     # first median
-    output[popfirst!(outindit)] = median(mf)
+    output[popfirst!(outindit)] = median(mf, nan=nan)
 
     # grow phase
     while !isfull(mf)
         grow!(mf, popfirst!(init))
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 
     # roll phase
     while !isdone(init)
         roll!(mf, popfirst!(init))
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 
     # shrink phase
     while !isdone(outindit)
         shrink!(mf)
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 end
 
-function _untapered_phases!(init, mf, output, outindit)
+function _untapered_phases!(init, mf, output, outindit, nan)
     # grow phase - no output yet
     while !isfull(mf)
         grow!(mf, popfirst!(init))
     end
 
     # first median
-    output[popfirst!(outindit)] = median(mf)
+    output[popfirst!(outindit)] = median(mf, nan=nan)
 
     # roll phase
     while !isdone(init)
         roll!(mf, popfirst!(init))
-        output[popfirst!(outindit)] = median(mf)
+        output[popfirst!(outindit)] = median(mf, nan=nan)
     end
 end
 

@@ -156,6 +156,57 @@ println("running tests...")
             roll!(mf, 2.); check_health(mf)
             @test median(mf) == 2.
         end
+
+        @testset "NaN can be ignored in median" begin
+            mf = MedianFilter(NaN, 2)
+            @test median(mf, nan=:ignore) |> isnan
+            grow!(mf, 1.); check_health(mf)
+            @test median(mf, nan=:ignore) == 1.
+            shrink!(mf); check_health(mf)
+            @test median(mf) == 1.
+
+            mf = MedianFilter(-1.0, 3)
+            @test median(mf, nan=:ignore) == -1.0
+            grow!(mf, NaN); check_health(mf)
+            @test median(mf, nan=:ignore) == -1.0
+            grow!(mf, NaN); check_health(mf)
+            @test median(mf, nan=:ignore) == -1.0
+            roll!(mf, 0.0); check_health(mf)
+            @test median(mf, nan=:ignore) == 0.0
+            roll!(mf, NaN); check_health(mf)
+            @test median(mf, nan=:ignore) == 0.0
+            shrink!(mf); check_health(mf)
+            @test median(mf, nan=:ignore) == 0.0
+            shrink!(mf); check_health(mf)
+            @test median(mf, nan=:ignore) |> isnan
+        end
+
+        @testset "Pure NaN Input" begin
+            mf = MedianFilter(NaN, 2)
+            @test median(mf) |> isnan
+            grow!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            shrink!(mf)
+            @test median(mf) |> isnan
+
+            mf = MedianFilter(NaN, 3)
+            grow!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            grow!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            shrink!(mf); check_health(mf)
+            @test median(mf) |> isnan
+            shrink!(mf); check_health(mf)
+            @test median(mf) |> isnan
+        end
     end
 
     @testset "High Level API Tests" begin
@@ -255,6 +306,10 @@ println("running tests...")
             for fixture in fixtures
                 @test all(fixture[3] .=== running_median(fixture[1], fixture[2], :asym, nan=:ignore))
             end
+        end
+
+        @testset "Ignore NaN Example" begin
+            @test all(running_median([-1.0, NaN, NaN, 0.0, NaN], 3, :asym, nan=:ignore) .=== [-1.0, -1.0, -1.0, 0.0, 0.0, 0.0, NaN])
         end
 
         @testset "Check views into arrays can be handled" begin

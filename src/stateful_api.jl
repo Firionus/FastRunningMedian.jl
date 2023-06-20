@@ -77,8 +77,16 @@ the high\\_heap. The top element of the low\\_heap then is the median.
 If the number of elements in MedianFilter is even, both heaps are the same size and the
 median is the mean of both top elements. 
 """
-function median(mf::MedianFilter)
-    if mf.nans > 0
+function median(mf::MedianFilter; nan=:include)
+    if !(nan in (:include, :ignore))
+        throw(ArgumentError("nan must be :include or :ignore"))
+    end
+
+    if mf.nans > 0 && nan == :include
+        return NaN
+    end
+
+    if mf.low_heap |> isempty
         return NaN
     end
 
@@ -273,8 +281,9 @@ function roll!(mf::MedianFilter, val)
 
     new_heap_element = (val, window_size(mf) + mf.heap_pos_offset + 1)
 
-    if window_size(mf) == 1
+    if mf.high_heap |> isempty
         update!(mf.low_heap, to_replace[2], new_heap_element)
+        push!(mf.heap_pos, to_replace)
         mf.heap_pos_offset += 1
         return
     end
