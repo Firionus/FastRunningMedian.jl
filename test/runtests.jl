@@ -1,5 +1,6 @@
 using FastRunningMedian, Test, DataStructures, JLD2, OffsetArrays
 import Statistics
+import FastRunningMedian: lo, hi, nan
 
 """
     check_health(mf::MedianFilter)
@@ -9,20 +10,25 @@ Check that all pointers point at a thing that again points back at them. Also ch
 Debug Function for MedianFilter. 
 """
 function check_health(mf::MedianFilter)
+    nan_count = 0
     for k in 1:length(mf.heap_pos)
         current_heap, current_heap_ind = mf.heap_pos[k]
-        if current_heap == true
+        if current_heap == lo
             a = mf.low_heap[current_heap_ind][2] - mf.heap_pos_offset
             # println(k, " ?= ", a)
             @assert k == a
-        else
+        elseif current_heap == hi
             a = mf.high_heap[current_heap_ind][2] - mf.heap_pos_offset
             # println(k, " ?= ", a)
             @assert k == a
+        else # nan
+            nan_count += 1
         end
     end
 
-    if length(mf) >= 2
+    @assert nan_count == mf.nans
+
+    if !isempty(mf.high_heap)
         @assert first(mf.low_heap) <= first(mf.high_heap)
     end
 end
@@ -113,6 +119,42 @@ println("running tests...")
             roll!(mf, 4.)
             shrink!(mf)
             @test_throws ErrorException roll!(mf, 5.)
+        end
+
+        @testset "Including NaN is default and makes whole window NaN" begin
+            mf = MedianFilter(NaN, 2)
+            @test median(mf) |> isnan
+            grow!(mf, 1.)
+            @test median(mf) |> isnan
+            shrink!(mf)
+            @test median(mf) == 1.
+
+            mf = MedianFilter(1., 3)
+            grow!(mf, 2.); check_health(mf)
+            @test median(mf) == 1.5
+            grow!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, 3.); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, 4.); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, 5.); check_health(mf)
+            @test median(mf) == 4.
+            roll!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, 6.); check_health(mf)
+            @test median(mf) |> isnan
+            shrink!(mf); check_health(mf)
+            @test median(mf) |> isnan
+            shrink!(mf); check_health(mf)
+            @test median(mf) == 6.
+
+            mf = MedianFilter(1., 1)
+            @test median(mf) == 1.
+            roll!(mf, NaN); check_health(mf)
+            @test median(mf) |> isnan
+            roll!(mf, 2.); check_health(mf)
+            @test median(mf) == 2.
         end
     end
 

@@ -9,6 +9,8 @@ Base.lt(o::TupleForward, a, b) = a[1] < b[1]
 struct TupleReverse <: Base.Ordering end
 Base.lt(o::TupleReverse, a, b) = a[1] > b[1]
 
+@enum ValueLocation::Int8 lo hi nan
+
 # Main struct in this package - provides state for stateful median calculation
 mutable struct MedianFilter{T}
     low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse}
@@ -16,21 +18,24 @@ mutable struct MedianFilter{T}
     # first tuple value is data, second tuple value is index in heap_pos (see heap_pos_offset!)
 
     # ordered like data in moving window would be
-    # first tuple value true if in low_heap, false if in high_heap
-    # second value is handle in corresponding heap
-    heap_pos::CircularBuffer{Tuple{Bool,Int}}
+    # first tuple value indicates whether values is in low heap, high heap or an Nan (not in heaps)
+    # second value is handle in corresponding heap; NaN's are 0
+    heap_pos::CircularBuffer{Tuple{ValueLocation,Int}}
 
     heap_pos_offset::Int
     # heap_pos is indexed with the first element at index 1. 
     # However the indices in the heaps might go out of date whenever overwriting elements at the beginning of the circular buffer
     # This is why index_in_heap_pos = heap_pos_indices_in_heaps - heap_pos_offset
 
+    nans::Int # number of NaN values in heap_pos
+
     # Inner constructor to enforce T <: Real
     function MedianFilter(low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse},
         high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward},
-        heap_pos::CircularBuffer{Tuple{Bool,Int}},
-        heap_pos_offset::Int) where {T<:Real}
-        return new{T}(low_heap, high_heap, heap_pos, heap_pos_offset)
+        heap_pos::CircularBuffer{Tuple{ValueLocation,Int}},
+        heap_pos_offset::Int,
+        nans::Int) where {T<:Real}
+        return new{T}(low_heap, high_heap, heap_pos, heap_pos_offset, nans)
     end
 end
 
@@ -45,13 +50,18 @@ Query with [`median`](@ref), [`length`](@ref), [`window_size`](@ref), [`isfull`]
 function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
     low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
     high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
-    heap_positions = CircularBuffer{Tuple{Bool,Int}}(window_size)
+    heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_size)
 
-    first_val_ind = push!(low_heap, (first_val, 1))
+    if first_val |> isnan
+        push!(heap_positions, (nan, 0))
+        nans = 1
+    else
+        first_val_ind = push!(low_heap, (first_val, 1))
+        push!(heap_positions, (lo, first_val_ind))
+        nans = 0
+    end
 
-    push!(heap_positions, (true, first_val_ind))
-
-    MedianFilter(low_heap, high_heap, heap_positions, 0)
+    MedianFilter(low_heap, high_heap, heap_positions, 0, nans)
 end
 
 """
@@ -68,6 +78,10 @@ If the number of elements in MedianFilter is even, both heaps are the same size 
 median is the mean of both top elements. 
 """
 function median(mf::MedianFilter)
+    if mf.nans > 0
+        return NaN
+    end
+
     if length(mf.low_heap) == length(mf.high_heap)
         # even number of elements
         # median is mean of both top elements
@@ -119,6 +133,24 @@ function grow!(mf::MedianFilter, val)
         error("grow! would grow circular buffer length by 1 and therefore exceed circular buffer capacity")
     end
 
+    _grow_unchecked!(mf, val)
+end
+
+function _grow_unchecked!(mf::MedianFilter, val)
+    if val |> isnan
+        mf.nans += 1
+        push!(mf.heap_pos, (nan, 0))
+        return
+    end
+
+    if length(mf.low_heap) == 0
+        # just push! new value onto low_heap
+        pushed_handle = push!(mf.low_heap, (val, 0))
+        push!(mf.heap_pos, (lo, pushed_handle))
+        mf.low_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
+        return
+    end
+
     if length(mf.low_heap) == length(mf.high_heap)
         # even number of elements
         # low_heap needs to grow
@@ -126,19 +158,19 @@ function grow!(mf::MedianFilter, val)
         if val <= middle_high[1]
             # just push! new value onto low_heap
             pushed_handle = push!(mf.low_heap, (val, 0))
-            push!(mf.heap_pos, (true, pushed_handle))
+            push!(mf.heap_pos, (lo, pushed_handle))
             mf.low_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
         else
             # replace middle_high in high_heap with new val and move middle_high to low_heap
 
-            # push new val to end of circular buffer an onto high_heap where it replaces to_displace
-            push!(mf.heap_pos, mf.heap_pos[middle_high[2]])
+            # push new val to end of circular buffer and onto high_heap where it replaces to_displace
+            push!(mf.heap_pos, mf.heap_pos[middle_high[2]-mf.heap_pos_offset])
             update!(mf.high_heap, mf.heap_pos[middle_high[2]-mf.heap_pos_offset][2],
                 (val, length(mf.heap_pos) + mf.heap_pos_offset))
             # move middle_high onto low_heap
             pushed_handle = push!(mf.low_heap, middle_high)
             # update heap_pos
-            mf.heap_pos[middle_high[2]-mf.heap_pos_offset] = (true, pushed_handle)
+            mf.heap_pos[middle_high[2]-mf.heap_pos_offset] = (lo, pushed_handle)
         end
     else
         # odd number of elements
@@ -147,22 +179,21 @@ function grow!(mf::MedianFilter, val)
         if val >= current_median[1]
             # just push! new value onto high_heap
             pushed_handle = push!(mf.high_heap, (val, 0))
-            push!(mf.heap_pos, (false, pushed_handle))
+            push!(mf.heap_pos, (hi, pushed_handle))
             mf.high_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
         else
             # replace current_median in low_heap with new val and move current_median to high_heap
 
             # push new val to end of circular buffer and onto low_heap where it replaces current_median
-            push!(mf.heap_pos, mf.heap_pos[current_median[2]])
+            push!(mf.heap_pos, mf.heap_pos[current_median[2]-mf.heap_pos_offset])
             update!(mf.low_heap, mf.heap_pos[current_median[2]-mf.heap_pos_offset][2],
                 (val, length(mf.heap_pos) + mf.heap_pos_offset))
             # move current_median onto high_heap
             pushed_handle = push!(mf.high_heap, current_median)
             # update heap_pos
-            mf.heap_pos[current_median[2]-mf.heap_pos_offset] = (false, pushed_handle)
+            mf.heap_pos[current_median[2]-mf.heap_pos_offset] = (hi, pushed_handle)
         end
     end
-    return
 end
 
 """
@@ -178,13 +209,22 @@ function shrink!(mf::MedianFilter)
         error("MedianFilter of length 1 cannot be shrunk further because it would not have a median anymore")
     end
 
+    _shrink_unchecked!(mf)
+end
+
+function _shrink_unchecked!(mf::MedianFilter)
     to_remove = popfirst!(mf.heap_pos)
     mf.heap_pos_offset += 1
+
+    if to_remove[1] == nan
+        mf.nans -= 1
+        return
+    end
 
     if length(mf.low_heap) == length(mf.high_heap)
         # even number of elements
         # high_heap needs to get smaller
-        if to_remove[1] == true
+        if to_remove[1] == lo
             # element-to-remove is in low_heap
             medium_high = pop!(mf.high_heap)
             update!(mf.low_heap, to_remove[2], medium_high)
@@ -196,7 +236,7 @@ function shrink!(mf::MedianFilter)
     else
         # odd number of elements
         # low_heap needs to get smaller
-        if to_remove[1] == true
+        if to_remove[1] == lo
             # element-to-remove is in low_heap
             delete!(mf.low_heap, to_remove[2])
         else
@@ -206,7 +246,6 @@ function shrink!(mf::MedianFilter)
             mf.heap_pos[current_median[2]-mf.heap_pos_offset] = to_remove
         end
     end
-    return
 end
 
 """
@@ -220,71 +259,79 @@ Will error when `mf` is not full yet - in this case you must first
 """
 function roll!(mf::MedianFilter, val)
     if !isfull(mf)
-        error("When rolling, maximum capacity of ring buffer must be met")
+        error("when rolling, maximum capacity of ring buffer must be met")
     end
 
     to_replace = mf.heap_pos[1]
+
+    if to_replace[1] == nan || val |> isnan
+        # might not be performance optimal
+        _shrink_unchecked!(mf)
+        _grow_unchecked!(mf, val)
+        return
+    end
+
     new_heap_element = (val, window_size(mf) + mf.heap_pos_offset + 1)
 
     if window_size(mf) == 1
         update!(mf.low_heap, to_replace[2], new_heap_element)
-        push!(mf.heap_pos, to_replace)
         mf.heap_pos_offset += 1
+        return
+    end
+
+    if val < first(mf.low_heap)[1]
+        # val should go into low_heap
+        if to_replace[1] == lo
+            # hole in low_heap
+            update!(mf.low_heap, to_replace[2], new_heap_element)
+            push!(mf.heap_pos, to_replace)
+            mf.heap_pos_offset += 1
+        elseif to_replace[1] == hi
+            # hole in high_heap
+            low_top, low_top_ind = top_with_handle(mf.low_heap)
+            # shift low_top into hole in high_heap
+            update!(mf.high_heap, to_replace[2], low_top)
+            # don't forget to update indices in heap_pos
+            mf.heap_pos[low_top[2]-mf.heap_pos_offset] = (hi, to_replace[2])
+            # put new val where low_top is
+            update!(mf.low_heap, low_top_ind, new_heap_element)
+            # perform circular push on circular buffer
+            push!(mf.heap_pos, (lo, low_top_ind))
+            mf.heap_pos_offset += 1
+        end
+    elseif val > first(mf.high_heap)[1]
+        # val should go into high_heap
+        if to_replace[1] == lo
+            # hole in low_heap
+            high_top, high_top_ind = top_with_handle(mf.high_heap)
+            # shift high_top into hole in low_heap
+            update!(mf.low_heap, to_replace[2], high_top)
+            # dont't forget to udpate indices in heap_pos
+            mf.heap_pos[high_top[2]-mf.heap_pos_offset] = (lo, to_replace[2])
+            # put new val where high_top is
+            update!(mf.high_heap, high_top_ind, new_heap_element)
+            # perform circular push on circular buffer
+            push!(mf.heap_pos, (hi, high_top_ind))
+            mf.heap_pos_offset += 1
+        elseif to_replace[1] == hi
+            # hole in high_heap
+            update!(mf.high_heap, to_replace[2], new_heap_element)
+            push!(mf.heap_pos, to_replace)
+            mf.heap_pos_offset += 1
+        end
     else
-        if val < first(mf.low_heap)[1]
-            # val should go into low_heap
-            if to_replace[1] == true
-                # hole in low_heap
-                update!(mf.low_heap, to_replace[2], new_heap_element)
-                push!(mf.heap_pos, to_replace)
-                mf.heap_pos_offset += 1
-            else
-                # hole in high_heap
-                low_top, low_top_ind = top_with_handle(mf.low_heap)
-                # shift low_top into hole in high_heap
-                update!(mf.high_heap, to_replace[2], low_top)
-                # don't forget to update indices in heap_pos
-                mf.heap_pos[low_top[2]-mf.heap_pos_offset] = (false, to_replace[2])
-                # put new val where low_top is
-                update!(mf.low_heap, low_top_ind, new_heap_element)
-                # perform circular push on circular buffer
-                push!(mf.heap_pos, (true, low_top_ind))
-                mf.heap_pos_offset += 1
-            end
-        elseif val > first(mf.high_heap)[1]
-            # val should go into high_heap
-            if to_replace[1] == true
-                # hole in low_heap
-                high_top, high_top_ind = top_with_handle(mf.high_heap)
-                # shift high_top into hole in low_heap
-                update!(mf.low_heap, to_replace[2], high_top)
-                # dont't forget to udpate indices in heap_pos
-                mf.heap_pos[high_top[2]-mf.heap_pos_offset] = (true, to_replace[2])
-                # put new val where high_top is
-                update!(mf.high_heap, high_top_ind, new_heap_element)
-                # perform circular push on circular buffer
-                push!(mf.heap_pos, (false, high_top_ind))
-                mf.heap_pos_offset += 1
-            else
-                # hole in high_heap
-                update!(mf.high_heap, to_replace[2], new_heap_element)
-                push!(mf.heap_pos, to_replace)
-                mf.heap_pos_offset += 1
-            end
-        else
-            # low_top <= val <= high_top
-            # put whereever hole is
-            if to_replace[1] == true
-                # hole in low_heap
-                update!(mf.low_heap, to_replace[2], new_heap_element)
-                push!(mf.heap_pos, to_replace)
-                mf.heap_pos_offset += 1
-            else
-                # hole in high_heap
-                update!(mf.high_heap, to_replace[2], new_heap_element)
-                push!(mf.heap_pos, to_replace)
-                mf.heap_pos_offset += 1
-            end
+        # low_top <= val <= high_top
+        # put whereever hole is
+        if to_replace[1] == lo
+            # hole in low_heap
+            update!(mf.low_heap, to_replace[2], new_heap_element)
+            push!(mf.heap_pos, to_replace)
+            mf.heap_pos_offset += 1
+        elseif to_replace[1] == hi
+            # hole in high_heap
+            update!(mf.high_heap, to_replace[2], new_heap_element)
+            push!(mf.heap_pos, to_replace)
+            mf.heap_pos_offset += 1
         end
     end
     return
