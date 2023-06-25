@@ -7,7 +7,7 @@ export running_median
 include("stateful_api.jl")
 
 """
-    running_median(input, window_size, tapering=:symmetric)
+    running_median(input, window_size, tapering=:symmetric; nan=:include)
 
 Run a median filter of `window_size` over the input array and return the result. 
 
@@ -20,6 +20,14 @@ The tapering decides the behaviour at the ends of the input. All taperings are m
 - `:none` or `:no`: No tapering towards the ends. If the input has N elements, the output is only N-window_size+1 long. 
 
 If you choose an even `window_size`, the elements of the output array lie in the middle between the input elements on a continuous underlying axis. 
+
+## NaN Handling
+
+By default, NaN values in the window will turn the median NaN as well. 
+
+Use the keyword argument `nan = :ignore` to ignore NaN values and calculate the median 
+over the remaining values in the window. If there are only NaNs in the window, the median
+will be NaN regardless. 
 
 ## Performance
 

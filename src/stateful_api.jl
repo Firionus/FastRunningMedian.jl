@@ -65,9 +65,16 @@ function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
 end
 
 """
-    median(mf::MedianFilter)
+    median(mf::MedianFilter; nan=:include)
 
 Determine the current median in `mf`. 
+
+## NaN Handling
+
+By default, any NaN value in the filter will turn the result NaN.
+
+Use the keyword argument `nan = :ignore` to ignore NaN values and calculate the median 
+over the remaining values. If there are only NaNs, the median will be NaN regardless. 
 
 ## Implementation
 
