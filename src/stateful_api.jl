@@ -48,8 +48,13 @@ Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref).
 Query with [`median`](@ref), [`length`](@ref), [`window_size`](@ref), [`isfull`](@ref). 
 """
 function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
-    low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
     high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
+    high_heap_max_size = window_size ÷ 2
+    sizehint!(high_heap, high_heap_max_size)
+
+    low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
+    sizehint!(low_heap, window_size - high_heap_max_size)
+
     heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_size)
 
     if first_val |> isnan

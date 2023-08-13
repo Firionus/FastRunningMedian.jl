@@ -319,6 +319,14 @@ println("running tests...")
         
     end
 
+    @testset "Allocation Regression Test" begin
+        x = range(1, step=1, length=1002)
+        w = 1001
+        _allocs_jit = @allocations(running_median(x,w))
+        allocations = @allocations(running_median(x,w))
+        @test allocations <= 517
+    end
+
     @testset "Aqua - Auto Quality Assurance" begin
         using Aqua
         Aqua.test_all(FastRunningMedian)
