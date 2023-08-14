@@ -266,6 +266,7 @@ function _shrink_unchecked!(mf::MedianFilter)
             mf.heap_pos[current_median[2]-mf.heap_pos_offset] = to_remove
         end
     end
+    return
 end
 
 """
