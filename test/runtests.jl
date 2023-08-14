@@ -207,6 +207,18 @@ println("running tests...")
             shrink!(mf); check_health(mf)
             @test median(mf) |> isnan
         end
+
+        @testset "Reset Median Filter" begin
+            mf = MedianFilter(1, 2)
+            grow!(mf, 2)
+            @test median(mf) == 1.5
+            FastRunningMedian.reset!(mf, 3)
+            check_health(mf)
+            @test median(mf) == 3
+            grow!(mf, 4)
+            check_health(mf)
+            @test median(mf) == 3.5
+        end
     end
 
     @testset "High Level API Tests" begin

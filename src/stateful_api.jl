@@ -1,6 +1,6 @@
 using DataStructures
 
-export MedianFilter, grow!, shrink!, roll!, isfull, median, length, window_size
+export MedianFilter, grow!, shrink!, roll!, reset!, isfull, median, length, window_size
 
 # Custom Orderings for DataStructures.MutableBinaryHeap
 struct TupleForward <: Base.Ordering end
@@ -57,16 +57,41 @@ function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
 
     heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_size)
 
-    if first_val |> isnan
-        push!(heap_positions, (nan, 0))
-        nans = 1
+    mf = MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
+    reset!(mf, first_val)
+end
+
+"""
+    reset!(mf::MedianFilter, first_value)
+
+Reset the median filter `mf` by emptying it and initializing with `first_value`.
+"""
+function reset!(mf::MedianFilter, first_value)
+    _empty_heap!(mf.high_heap)
+    _empty_heap!(mf.low_heap)
+    empty!(mf.heap_pos)
+
+    if first_value |> isnan
+        push!(mf.heap_pos, (nan, 0))
+        mf.nans = 1
     else
-        first_val_ind = push!(low_heap, (first_val, 1))
-        push!(heap_positions, (lo, first_val_ind))
-        nans = 0
+        first_value_ind = push!(mf.low_heap, (first_value, 1))
+        push!(mf.heap_pos, (lo, first_value_ind))
+        mf.nans = 0
     end
 
-    MedianFilter(low_heap, high_heap, heap_positions, 0, nans)
+    mf.heap_pos_offset = 0
+
+    mf
+end
+
+# TODO this might move into DataStructures.jl in the future
+# track https://github.com/JuliaCollections/DataStructures.jl/issues/866
+function _empty_heap!(heap)
+    while !isempty(heap)
+        pop!(heap)
+    end
+    return heap
 end
 
 """

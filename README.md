@@ -63,7 +63,7 @@ Use the keyword argument `nan = :ignore` to ignore NaN values and calculate the 
 The underlying algorithm should scale as O(N log w) with the input size N and the window_size w. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/FastRunningMedian.jl#L9-L35' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/FastRunningMedian.jl#L9-L35' class='documenter-source'>source</a><br>
 
 
 <a id='Taperings-Visualized'></a>
@@ -121,7 +121,7 @@ Construct a stateful running median filter.
 Manipulate with [`grow!`](README.md#FastRunningMedian.grow!), [`roll!`](README.md#FastRunningMedian.roll!), [`shrink!`](README.md#FastRunningMedian.shrink!).  Query with [`median`](README.md#FastRunningMedian.median), [`length`](README.md#Base.length), [`window_size`](README.md#FastRunningMedian.window_size), [`isfull`](README.md#FastRunningMedian.isfull). 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L42-L49' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L42-L49' class='documenter-source'>source</a><br>
 
 <a id='FastRunningMedian.grow!' href='#FastRunningMedian.grow!'>#</a>
 **`FastRunningMedian.grow!`** &mdash; *Function*.
@@ -139,7 +139,7 @@ If mf would grow beyond maximum window size, an error is thrown. In this case yo
 The new element is pushed onto the end of the circular buffer. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L135-L144' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L165-L174' class='documenter-source'>source</a><br>
 
 <a id='FastRunningMedian.roll!' href='#FastRunningMedian.roll!'>#</a>
 **`FastRunningMedian.roll!`** &mdash; *Function*.
@@ -155,7 +155,7 @@ Roll the window over to the next position by replacing the first and oldest elem
 Will error when `mf` is not full yet - in this case you must first [`grow!`](README.md#FastRunningMedian.grow!) mf to maximum capacity. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L266-L274' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L297-L305' class='documenter-source'>source</a><br>
 
 <a id='FastRunningMedian.shrink!' href='#FastRunningMedian.shrink!'>#</a>
 **`FastRunningMedian.shrink!`** &mdash; *Function*.
@@ -171,7 +171,21 @@ Shrinks `mf` by removing the first and oldest element in the circular buffer.
 Will error if mf contains only one element as a MedianFilter with zero elements would not have a median. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L214-L221' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L244-L251' class='documenter-source'>source</a><br>
+
+<a id='FastRunningMedian.reset!' href='#FastRunningMedian.reset!'>#</a>
+**`FastRunningMedian.reset!`** &mdash; *Function*.
+
+
+
+```julia
+reset!(mf::MedianFilter, first_value)
+```
+
+Reset the median filter `mf` by emptying it and initializing with `first_value`.
+
+
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L64-L68' class='documenter-source'>source</a><br>
 
 <a id='FastRunningMedian.median' href='#FastRunningMedian.median'>#</a>
 **`FastRunningMedian.median`** &mdash; *Function*.
@@ -197,7 +211,7 @@ If the number of elements in MedianFilter is odd, the low_heap is always one ele
 If the number of elements in MedianFilter is even, both heaps are the same size and the median is the mean of both top elements. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L67-L86' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L97-L116' class='documenter-source'>source</a><br>
 
 <a id='Base.length' href='#Base.length'>#</a>
 **`Base.length`** &mdash; *Function*.
@@ -213,7 +227,7 @@ Returns the number of elements in the stateful median filter `mf`.
 This number is equal to the length of the internal circular buffer. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L110-L116' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L140-L146' class='documenter-source'>source</a><br>
 
 <a id='FastRunningMedian.window_size' href='#FastRunningMedian.window_size'>#</a>
 **`FastRunningMedian.window_size`** &mdash; *Function*.
@@ -229,7 +243,7 @@ Returns the window_size of the stateful median filter `mf`.
 This number is equal to the capacity of the internal circular buffer. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L119-L125' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L149-L155' class='documenter-source'>source</a><br>
 
 <a id='FastRunningMedian.isfull' href='#FastRunningMedian.isfull'>#</a>
 **`FastRunningMedian.isfull`** &mdash; *Function*.
@@ -243,7 +257,7 @@ isfull(mf::MedianFilter)
 Returns true, when the length of the stateful median filter `mf` equals its window_size. 
 
 
-<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/90fa82a127a78208f1cd4134e200cd93e8a61a61/src/stateful_api.jl#L128-L132' class='documenter-source'>source</a><br>
+<a target='_blank' href='https://github.com/Firionus/FastRunningMedian.jl/blob/6dee74a8b6f40f6e9ae57554ce5d24eed8744d38/src/stateful_api.jl#L158-L162' class='documenter-source'>source</a><br>
 
 
 <a id='Sources'></a>

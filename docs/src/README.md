@@ -41,6 +41,7 @@ MedianFilter
 grow!
 roll!
 shrink!
+reset!
 median
 length
 window_size
