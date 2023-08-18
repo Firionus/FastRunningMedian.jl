@@ -2,7 +2,9 @@ module FastRunningMedian
 
 using Base.Iterators: isdone
 
-export running_median
+export running_median, running_median!
+
+# TODO repo-wide, change from window_size to window_length, as it is more in line with Julia conventions
 
 include("stateful_api.jl")
 
@@ -34,62 +36,90 @@ will be NaN regardless.
 The underlying algorithm should scale as O(N log w) with the input size N and the window_size w. 
 """
 function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric; nan=:include) where {T<:Real}
-    if length(input) == 0
-        error("input array must be non-empty")
+
+    window_size = _validated_window_size(window_size, length(input), tapering)
+    # TODO zero value will later be reset anyway. Remove the reset! call in the constructor (breaking API change) in the future, so we
+    # don't have to provide a default here
+    mf = MedianFilter(zero(eltype(input)), window_size)
+
+    output_length = _output_length(length(input), window_size, tapering)
+    # TODO make output type generic?
+    output = Array{Float64,1}(undef, output_length)
+
+    _unchecked_running_median!(mf, output, input, tapering, nan)
+end
+
+# TODO order of functions?
+
+function _validated_window_size(window_size, input_length, tapering)
+    input_length > 0 || error("input array must be non-empty")
+    window_size >= 1 || error("window_size must be 1 or bigger")
+    if tapering in (:symmetric, :sym) && input_length |> iseven
+        window_size = min(window_size, input_length - 1)
+    else
+        window_size = min(window_size, input_length) 
     end
+    window_size
+end
 
-    if window_size < 1
-        error("window_size must be 1 or bigger")
+function _output_length(input_length, window_size, tapering)
+    if tapering in (:symmetric, :sym)
+        window_size |> isodd ? input_length : input_length - 1
+    elseif tapering in (:asymmetric, :asym)
+        input_length + window_size - 1
+    elseif tapering in (:asymmetric_truncated, :asym_trunc)
+        window_size |> isodd ? input_length : input_length - 1
+    elseif tapering in (:none, :no)
+        input_length - window_size + 1
+    else
+        error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
     end
+end
 
-    N = length(input)
+# TODO Docstring and include in README
+function running_median!(
+    mf::MedianFilter, 
+    output::AbstractVector{V}, 
+    input::AbstractVector{T}, 
+    tapering=:symmetric; 
+    nan=:include) where {T<:Real, V<:Real}
 
-    # clamp window size to N
-    window_size = min(window_size, N)
+    # TODO what if Float64 or T can't be converted to V? -> Test
+    # NaN's with Int output? Float values with Int output? Int input input with Int output?
+
+    winsize = window_size(mf)
+    expected_winsize = _validated_window_size(winsize, length(input), tapering)
+    winsize == expected_winsize || error(
+        "unexpected median filter window size of $winsize instead of $expected_winsize")
+
+    expected_output_length = _output_length(length(input), winsize, tapering)
+    length(output) == expected_output_length || error(
+        "unexpected output length $(length(output)) instead of $expected_output_length")
+
+    _unchecked_running_median!(mf, output, input, tapering, nan)
+end
+
+function _unchecked_running_median!(mf, output, input, tapering, nan)
+    # input iterator
+    init = Iterators.Stateful(input)
+    # output index iterator
+    outindit = Iterators.Stateful(eachindex(output))
+
+    reset!(mf, popfirst!(init))
 
     if tapering in (:symmetric, :sym)
-        if N |> iseven
-            max_window_size = N - 1
-            window_size = min(window_size, max_window_size)
-        end
-        N_out = window_size |> isodd ? N : N - 1
-        prep = _prepare_running_median(input, window_size, N_out)
-        _symmetric_phases!(prep..., nan)
+        _symmetric_phases!(init, mf, output, outindit, nan)
     elseif tapering in (:asymmetric, :asym)
-        N_out = N + window_size - 1
-        prep = _prepare_running_median(input, window_size, N_out)
-        _asymmetric_phases!(prep..., nan)
+        _asymmetric_phases!(init, mf, output, outindit, nan)
     elseif tapering in (:asymmetric_truncated, :asym_trunc)
-        N_out = window_size |> isodd ? N : N - 1
-        prep = _prepare_running_median(input, window_size, N_out)
-        _asymmetric_truncated_phases!(prep..., nan)
+        _asymmetric_truncated_phases!(init, mf, output, outindit, nan)
     elseif tapering in (:none, :no)
-        N_out = N - window_size + 1
-        prep = _prepare_running_median(input, window_size, N_out)
-        _untapered_phases!(prep..., nan)
+        _untapered_phases!(init, mf, output, outindit, nan)
     else
         error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
     end
 
-    return prep.output
-end
-
-function _prepare_running_median(input, window_size, N_out)
-    # input iterator
-    init = Iterators.Stateful(input)
-
-    output = Array{Float64,1}(undef, N_out)
-    mf = MedianFilter(popfirst!(init), window_size)
-
-    # output index iterator
-    outindit = Iterators.Stateful(eachindex(output))
-
-    return (
-        init=init,
-        mf=mf,
-        output=output,
-        outindit=outindit,
-    )
+    output
 end
 
 function _symmetric_phases!(init, mf, output, outindit, nan)

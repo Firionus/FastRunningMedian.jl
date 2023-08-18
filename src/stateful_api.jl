@@ -58,6 +58,7 @@ function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
     heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_size)
 
     mf = MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
+    # TODO why not just return an empty one here and let the user reset it before starting iteration? Would be more flexible...
     reset!(mf, first_val)
 end
 
@@ -71,6 +72,7 @@ function reset!(mf::MedianFilter, first_value)
     _empty_heap!(mf.low_heap)
     empty!(mf.heap_pos)
 
+    # TODO could be done by grow!
     if first_value |> isnan
         push!(mf.heap_pos, (nan, 0))
         mf.nans = 1
@@ -239,6 +241,7 @@ function _grow_unchecked!(mf::MedianFilter, val)
             mf.heap_pos[current_median[2]-mf.heap_pos_offset] = (hi, pushed_handle)
         end
     end
+    return
 end
 
 """

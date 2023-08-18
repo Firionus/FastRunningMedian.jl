@@ -219,6 +219,16 @@ println("running tests...")
             check_health(mf)
             @test median(mf) == 3.5
         end
+
+        @testset "Compare running_median! to Naive Asymmetric Median" begin
+            @load "fixtures/asymmetric.jld2" fixtures
+            for fixture in fixtures
+                mf = MedianFilter(0., min(length(fixture[1]), fixture[2]))
+                output_length = length(fixture[1])+window_size(mf)-1
+                output = zeros(output_length)
+                @test fixture[3] == running_median!(mf, output, fixture[1], :asym)
+            end
+        end
     end
 
     @testset "High Level API Tests" begin
@@ -336,7 +346,7 @@ println("running tests...")
         w = 1001
         _allocs_jit = @allocations(running_median(x,w))
         allocations = @allocations(running_median(x,w))
-        @test allocations <= 17
+        @test allocations <= 18
     end
 
     @testset "Aqua - Auto Quality Assurance" begin
