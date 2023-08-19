@@ -115,9 +115,9 @@ println("running tests...")
             mf = MedianFilter(1., 3)
             grow!(mf, 2.)
             @test_throws ErrorException roll!(mf, 3.)
-            grow!(mf, 3.)
-            roll!(mf, 4.)
-            shrink!(mf)
+            @test grow!(mf, 3.) == mf
+            @test roll!(mf, 4.) == mf
+            @test shrink!(mf) == mf
             @test_throws ErrorException roll!(mf, 5.)
         end
 
@@ -210,12 +210,12 @@ println("running tests...")
 
         @testset "Reset Median Filter" begin
             mf = MedianFilter(1, 2)
-            grow!(mf, 2)
+            @test grow!(mf, 2) == mf
             @test median(mf) == 1.5
-            FastRunningMedian.reset!(mf, 3)
+            @test FastRunningMedian.reset!(mf, 3) == mf
             check_health(mf)
             @test median(mf) == 3
-            grow!(mf, 4)
+            @test grow!(mf, 4) == mf
             check_health(mf)
             @test median(mf) == 3.5
         end

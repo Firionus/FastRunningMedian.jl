@@ -44,7 +44,7 @@ end
 
 Construct a stateful running median filter. 
 
-Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref). 
+Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref), [`reset!`](@ref). 
 Query with [`median`](@ref), [`length`](@ref), [`window_length`](@ref), [`isfull`](@ref). 
 """
 function MedianFilter(first_val::T, window_length::Int) where {T<:Real}
@@ -69,19 +69,15 @@ end
 
 Reset the median filter `mf` by emptying it and initializing with `first_value`.
 """
-function reset!(mf::MedianFilter, first_value)
+function reset!(mf::MedianFilter, first_value)::MedianFilter
     _empty_heap!(mf.high_heap)
     _empty_heap!(mf.low_heap)
     empty!(mf.heap_pos)
 
     mf.heap_pos_offset = 0
-
     grow!(mf, first_value)
 
-    # TODO BREAKING why does this return mf, but the other modifying functions don't?
-    # We should align with Julia convention to return the modified collection
-    # Note this in the function signature!
-    mf
+    return mf
 end
 
 # TODO this might move into DataStructures.jl in the future
@@ -162,7 +158,7 @@ Returns true when the length of the stateful median filter `mf` equals its windo
 isfull(mf::MedianFilter) = mf.heap_pos |> DataStructures.isfull
 
 """
-    grow!(mf::MedianFilter, val)
+    grow!(mf::MedianFilter, val) -> mf
 
 Grow mf with the new value `val`. 
 
@@ -171,7 +167,7 @@ you probably wanted to use [`roll!`](@ref).
 
 The new element is pushed onto the end of the circular buffer. 
 """
-function grow!(mf::MedianFilter, val)
+function grow!(mf::MedianFilter, val)::MedianFilter
     # check that we don't grow beyond circular buffer capacity
     if length(mf) + 1 > window_length(mf)
         error("grow! would grow circular buffer length by 1 and therefore exceed circular buffer capacity")
@@ -180,11 +176,11 @@ function grow!(mf::MedianFilter, val)
     _grow_unchecked!(mf, val)
 end
 
-function _grow_unchecked!(mf::MedianFilter, val)
+function _grow_unchecked!(mf::MedianFilter, val)::MedianFilter
     if val |> isnan
         mf.nans += 1
         push!(mf.heap_pos, (nan, 0))
-        return
+        return mf
     end
 
     if length(mf.low_heap) == 0
@@ -192,7 +188,7 @@ function _grow_unchecked!(mf::MedianFilter, val)
         pushed_handle = push!(mf.low_heap, (val, 0))
         push!(mf.heap_pos, (lo, pushed_handle))
         mf.low_heap[pushed_handle] = (val, length(mf.heap_pos) + mf.heap_pos_offset)
-        return
+        return mf
     end
 
     if length(mf.low_heap) == length(mf.high_heap)
@@ -238,18 +234,18 @@ function _grow_unchecked!(mf::MedianFilter, val)
             mf.heap_pos[current_median[2]-mf.heap_pos_offset] = (hi, pushed_handle)
         end
     end
-    return
+    return mf
 end
 
 """
-    shrink!(mf::MedianFilter)
+    shrink!(mf::MedianFilter) -> mf
 
 Shrinks `mf` by removing the first and oldest element in the circular buffer. 
 
 Will error if mf contains only one element as a MedianFilter with zero elements
 would not have a median. 
 """
-function shrink!(mf::MedianFilter)
+function shrink!(mf::MedianFilter)::MedianFilter
     if length(mf.heap_pos) <= 1
         error("MedianFilter of length 1 cannot be shrunk further because it would not have a median anymore")
     end
@@ -257,13 +253,13 @@ function shrink!(mf::MedianFilter)
     _shrink_unchecked!(mf)
 end
 
-function _shrink_unchecked!(mf::MedianFilter)
+function _shrink_unchecked!(mf::MedianFilter)::MedianFilter
     to_remove = popfirst!(mf.heap_pos)
     mf.heap_pos_offset += 1
 
     if to_remove[1] == nan
         mf.nans -= 1
-        return
+        return mf
     end
 
     if length(mf.low_heap) == length(mf.high_heap)
@@ -291,11 +287,11 @@ function _shrink_unchecked!(mf::MedianFilter)
             mf.heap_pos[current_median[2]-mf.heap_pos_offset] = to_remove
         end
     end
-    return
+    return mf
 end
 
 """
-    roll!(mf::MedianFilter, val)
+    roll!(mf::MedianFilter, val) -> mf
 
 Roll the window over to the next position by replacing the first and oldest
 element in the ciruclar buffer with the new value `val`. 
@@ -303,7 +299,7 @@ element in the ciruclar buffer with the new value `val`.
 Will error when `mf` is not full yet - in this case you must first
 [`grow!`](@ref) mf to maximum capacity. 
 """
-function roll!(mf::MedianFilter, val)
+function roll!(mf::MedianFilter, val)::MedianFilter
     if !isfull(mf)
         error("when rolling, maximum capacity of ring buffer must be met")
     end
@@ -314,7 +310,7 @@ function roll!(mf::MedianFilter, val)
         # might not be performance optimal
         _shrink_unchecked!(mf)
         _grow_unchecked!(mf, val)
-        return
+        return mf
     end
 
     new_heap_element = (val, window_length(mf) + mf.heap_pos_offset + 1)
@@ -323,7 +319,7 @@ function roll!(mf::MedianFilter, val)
         update!(mf.low_heap, to_replace[2], new_heap_element)
         push!(mf.heap_pos, to_replace)
         mf.heap_pos_offset += 1
-        return
+        return mf
     end
 
     if val < first(mf.low_heap)[1]
@@ -381,5 +377,5 @@ function roll!(mf::MedianFilter, val)
             mf.heap_pos_offset += 1
         end
     end
-    return
+    return mf
 end
