@@ -58,12 +58,14 @@ function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
     heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_size)
 
     mf = MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
-    # TODO why not just return an empty one here and let the user reset it before starting iteration? Would be more flexible...
+    # TODO BREAKING return empty median filter without initial value, 
+    # let the user grow! whenever they want
+    # this is more flexible and eases our internal code as well
     reset!(mf, first_val)
 end
 
 """
-    reset!(mf::MedianFilter, first_value)
+    reset!(mf::MedianFilter, first_value) -> mf
 
 Reset the median filter `mf` by emptying it and initializing with `first_value`.
 """
@@ -72,18 +74,13 @@ function reset!(mf::MedianFilter, first_value)
     _empty_heap!(mf.low_heap)
     empty!(mf.heap_pos)
 
-    # TODO could be done by grow!
-    if first_value |> isnan
-        push!(mf.heap_pos, (nan, 0))
-        mf.nans = 1
-    else
-        first_value_ind = push!(mf.low_heap, (first_value, 1))
-        push!(mf.heap_pos, (lo, first_value_ind))
-        mf.nans = 0
-    end
-
     mf.heap_pos_offset = 0
 
+    grow!(mf, first_value)
+
+    # TODO why does this return mf, but the other modifying functions don't?
+    # We should align with Julia convention to return the modified collection
+    # Note this in the function signature!
     mf
 end
 

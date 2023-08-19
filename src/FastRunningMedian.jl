@@ -38,9 +38,8 @@ The underlying algorithm should scale as O(N log w) with the input size N and th
 function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric; nan=:include) where {T<:Real}
 
     window_size = _validated_window_size(window_size, length(input), tapering)
-    # TODO zero value will later be reset anyway. 
-    # Remove the reset! call in the constructor (breaking API change) in the future, 
-    # so we don't have to provide a default here
+    # TODO zero value will later be reset anyway
+    # change when an initial value is not required anymore
     mf = MedianFilter(zero(eltype(input)), window_size)
 
     output_length = _output_length(length(input), window_size, tapering)
@@ -48,33 +47,6 @@ function running_median(input::AbstractVector{T}, window_size::Integer, tapering
     output = Array{Float64,1}(undef, output_length)
 
     _unchecked_running_median!(mf, output, input, tapering, nan)
-end
-
-# TODO order of functions?
-
-function _validated_window_size(window_size, input_length, tapering)
-    input_length > 0 || error("input array must be non-empty")
-    window_size >= 1 || error("window_size must be 1 or bigger")
-    if tapering in (:symmetric, :sym) && input_length |> iseven
-        window_size = min(window_size, input_length - 1)
-    else
-        window_size = min(window_size, input_length) 
-    end
-    window_size
-end
-
-function _output_length(input_length, window_size, tapering)
-    if tapering in (:symmetric, :sym)
-        window_size |> isodd ? input_length : input_length - 1
-    elseif tapering in (:asymmetric, :asym)
-        input_length + window_size - 1
-    elseif tapering in (:asymmetric_truncated, :asym_trunc)
-        window_size |> isodd ? input_length : input_length - 1
-    elseif tapering in (:none, :no)
-        input_length - window_size + 1
-    else
-        error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
-    end
 end
 
 """
@@ -118,11 +90,11 @@ output
 ```
 """
 function running_median!(
-    mf::MedianFilter, 
-    output::AbstractVector{V}, 
-    input::AbstractVector{T}, 
-    tapering=:symmetric; 
-    nan=:include) where {T<:Real, V<:Real}
+    mf::MedianFilter,
+    output::AbstractVector{V},
+    input::AbstractVector{T},
+    tapering=:symmetric;
+    nan=:include) where {T<:Real,V<:Real}
 
     winsize = window_size(mf)
     expected_winsize = _validated_window_size(winsize, length(input), tapering)
@@ -135,6 +107,32 @@ function running_median!(
 
     _unchecked_running_median!(mf, output, input, tapering, nan)
 end
+
+function _validated_window_size(window_size, input_length, tapering)
+    input_length > 0 || error("input array must be non-empty")
+    window_size >= 1 || error("window_size must be 1 or bigger")
+    if tapering in (:symmetric, :sym) && input_length |> iseven
+        window_size = min(window_size, input_length - 1)
+    else
+        window_size = min(window_size, input_length)
+    end
+    window_size
+end
+
+function _output_length(input_length, window_size, tapering)
+    if tapering in (:symmetric, :sym)
+        window_size |> isodd ? input_length : input_length - 1
+    elseif tapering in (:asymmetric, :asym)
+        input_length + window_size - 1
+    elseif tapering in (:asymmetric_truncated, :asym_trunc)
+        window_size |> isodd ? input_length : input_length - 1
+    elseif tapering in (:none, :no)
+        input_length - window_size + 1
+    else
+        error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
+    end
+end
+
 
 function _unchecked_running_median!(mf, output, input, tapering, nan)
     # input iterator
