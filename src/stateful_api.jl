@@ -78,7 +78,7 @@ function reset!(mf::MedianFilter, first_value)
 
     grow!(mf, first_value)
 
-    # TODO why does this return mf, but the other modifying functions don't?
+    # TODO BREAKING why does this return mf, but the other modifying functions don't?
     # We should align with Julia convention to return the modified collection
     # Note this in the function signature!
     mf

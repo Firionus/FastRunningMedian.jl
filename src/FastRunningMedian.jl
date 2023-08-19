@@ -9,33 +9,54 @@ export running_median, running_median!
 include("stateful_api.jl")
 
 """
-    running_median(input, window_size, tapering=:symmetric; nan=:include)
+    running_median(input, window_size, tapering=:symmetric; kwargs...) -> output
 
 Run a median filter of `window_size` over the input array and return the result. 
 
 ## Taperings
 
-The tapering decides the behaviour at the ends of the input. All taperings are mirror symmetric with respect to the middle of the input array. The available taperings are:
-- `:symmteric` or `:sym`: Ensure that the window is symmetric around each point of the output array by always growing or shrinking the window by 2. The output has the same length as the input if `window_size` is odd. If `window_size` is even, the output has one element less. 
-- `:asymmetric` or `:asym`: Always adds or removes one element when calculating the next output value. Creates asymmetric windowing at the edges of the array. If the input is N long, the output is N+window_size-1 elements long. 
-- `:asymmetric_truncated` or `:asym_trunc`: The same as asymmetric, but truncated at beginning and end to match the size of `:symmetric`. 
-- `:none` or `:no`: No tapering towards the ends. If the input has N elements, the output is only N-window_size+1 long. 
+The tapering decides the behaviour at the ends of the input. All taperings are
+mirror symmetric with respect to the middle of the input array. The available
+taperings are:
+- `:symmteric` or `:sym`: Ensure that the window is symmetric around each point
+  of the output array by always growing or shrinking the window by 2. The output
+  has the same length as the input if `window_size` is odd. If `window_size` is
+  even, the output has one element less. 
+- `:asymmetric` or `:asym`: Always adds or removes one element when calculating
+  the next output value. Creates asymmetric windowing at the edges of the array.
+  If the input is N long, the output is N+window_size-1 elements long. 
+- `:asymmetric_truncated` or `:asym_trunc`: The same as asymmetric, but
+  truncated at beginning and end to match the size of `:symmetric`. 
+- `:none` or `:no`: No tapering towards the ends. If the input has N elements,
+  the output is only N-window_size+1 long. 
 
-If you choose an even `window_size`, the elements of the output array lie in the middle between the input elements on a continuous underlying axis. 
+If you choose an even `window_size`, the elements of the output array lie in the
+middle between the input elements on a continuous underlying axis. 
 
-## NaN Handling
+## Keyword Arguments
 
-By default, NaN values in the window will turn the median NaN as well. 
-
-Use the keyword argument `nan = :ignore` to ignore NaN values and calculate the median 
-over the remaining values in the window. If there are only NaNs in the window, the median
-will be NaN regardless. 
+- `nan=:include`: By default, NaN values in the window will turn the median NaN
+  as well. Use `nan = :ignore` to ignore NaN values and calculate the median
+  over the remaining values in the window. If there are only NaNs in the window,
+  the median will be NaN regardless. 
+- `output_eltype=Float64`: Element type of the output array. The output element
+  type should allow converting from Float64 and the input element type. The
+  exception is odd window sizes with taperings `:no` or `:sym`, in which case
+  the output element type only has to allow converting from the input element
+  type. 
 
 ## Performance
 
-The underlying algorithm should scale as O(N log w) with the input size N and the window_size w. 
+The underlying algorithm should scale as O(N log w) with the input size N and
+the window_size w. 
 """
-function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric; nan=:include) where {T<:Real}
+function running_median(
+    input::AbstractVector{T}, 
+    window_size::Integer, 
+    tapering=:symmetric;
+    nan=:include,
+    output_eltype=Float64,
+    ) where {T<:Real}
 
     window_size = _validated_window_size(window_size, length(input), tapering)
     # TODO zero value will later be reset anyway
@@ -43,14 +64,13 @@ function running_median(input::AbstractVector{T}, window_size::Integer, tapering
     mf = MedianFilter(zero(eltype(input)), window_size)
 
     output_length = _output_length(length(input), window_size, tapering)
-    # TODO make output type generic?
-    output = Array{Float64,1}(undef, output_length)
+    output = Array{output_eltype,1}(undef, output_length)
 
     _unchecked_running_median!(mf, output, input, tapering, nan)
 end
 
 """
-    running_median!(mf::MedianFilter, output, input, tapering=:sym; nan=:include)
+    running_median!(mf::MedianFilter, output, input, tapering=:sym; nan=:include) -> output
 
 Use `mf` to calculate the running median of `input` and write the result to
 `output`.
@@ -60,12 +80,7 @@ allocation for the median filter and the output vector. This is useful when you
 have to calculate many running medians of the same window size (see
 examples below).
 
-The output element type should allow converting from Float64 and the input
-element type. The exception is odd window sizes with taperings `:no` or `:sym`,
-in which case there is no mean to calculate and the output element type only has
-to allow converting from the input element type. 
-
-For further explanation of the API, see [`running_median`](@ref).
+For all details, see [`running_median`](@ref).
 
 # Examples
 ```jldoctest
