@@ -38,8 +38,9 @@ The underlying algorithm should scale as O(N log w) with the input size N and th
 function running_median(input::AbstractVector{T}, window_size::Integer, tapering=:symmetric; nan=:include) where {T<:Real}
 
     window_size = _validated_window_size(window_size, length(input), tapering)
-    # TODO zero value will later be reset anyway. Remove the reset! call in the constructor (breaking API change) in the future, so we
-    # don't have to provide a default here
+    # TODO zero value will later be reset anyway. 
+    # Remove the reset! call in the constructor (breaking API change) in the future, 
+    # so we don't have to provide a default here
     mf = MedianFilter(zero(eltype(input)), window_size)
 
     output_length = _output_length(length(input), window_size, tapering)
@@ -76,16 +77,52 @@ function _output_length(input_length, window_size, tapering)
     end
 end
 
-# TODO Docstring and include in README
+"""
+    running_median!(mf::MedianFilter, output, input, tapering=:sym; nan=:include)
+
+Use `mf` to calculate the running median of `input` and write the result to
+`output`.
+
+Compared to [`running_median`](@ref), this function lets you take control of
+allocation for the median filter and the output vector. This is useful when you
+have to calculate many running medians of the same window size (see
+examples below).
+
+The output element type should allow converting from Float64 and the input
+element type. The exception is odd window sizes with taperings `:no` or `:sym`,
+in which case there is no mean to calculate and the output element type only has
+to allow converting from the input element type. 
+
+For further explanation of the API, see [`running_median`](@ref).
+
+# Examples
+```jldoctest
+input = [4 5 6;
+         1 0 9;
+         9 8 7;
+         3 1 2;]
+output = similar(input, (4,3))
+mf = MedianFilter(42, 3) # first value does not matter
+for j in axes(input, 2) # run median over each column
+    # re-use mf in every iteration
+    running_median!(mf, @view(output[:,j]), input[:,j])
+end
+output
+
+# output
+4×3 Matrix{Int64}:
+ 4  5  6
+ 4  5  7
+ 3  1  7
+ 3  1  2
+```
+"""
 function running_median!(
     mf::MedianFilter, 
     output::AbstractVector{V}, 
     input::AbstractVector{T}, 
     tapering=:symmetric; 
     nan=:include) where {T<:Real, V<:Real}
-
-    # TODO what if Float64 or T can't be converted to V? -> Test
-    # NaN's with Int output? Float values with Int output? Int input input with Int output?
 
     winsize = window_size(mf)
     expected_winsize = _validated_window_size(winsize, length(input), tapering)

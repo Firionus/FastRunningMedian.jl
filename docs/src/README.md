@@ -14,6 +14,7 @@ In Julia, execute:
 
 ```@docs
 running_median
+running_median!
 ```
 
 ## Taperings Visualized

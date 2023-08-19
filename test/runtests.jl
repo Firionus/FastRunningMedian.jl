@@ -229,6 +229,19 @@ println("running tests...")
                 @test fixture[3] == running_median!(mf, output, fixture[1], :asym)
             end
         end
+
+        @testset "running_median! with integers" begin
+            mf = MedianFilter(0, 2)
+            input = [1,2,3,4]
+            output = [0,0,0]
+            @test_throws InexactError running_median!(mf, output, input, :no)
+
+            mf = MedianFilter(0, 3)
+            input = [1,2,3,4]
+            output = [0,0]
+            running_median!(mf, output, input, :no)
+            @test output == [2,3]
+        end
     end
 
     @testset "High Level API Tests" begin

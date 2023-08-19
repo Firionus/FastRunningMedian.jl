@@ -7,6 +7,8 @@ push!(LOAD_PATH,"../src/")
 
 using Documenter, DocumenterMarkdown, FastRunningMedian
 
+DocMeta.setdocmeta!(FastRunningMedian, :DocTestSetup, :(using FastRunningMedian); recursive=true)
+
 makedocs(
     format=Markdown(),
     modules=[FastRunningMedian]
