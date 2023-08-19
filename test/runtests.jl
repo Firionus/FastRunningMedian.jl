@@ -73,12 +73,12 @@ println("running tests...")
             @load "fixtures/roll.jld2" roll_fixtures
 
             function roll_test(initial_values, roll_values, expected_medians)
-                window_size = length(initial_values)
-                mf = MedianFilter(initial_values[1], window_size)
-                for i in 2:window_size
+                window_length = length(initial_values)
+                mf = MedianFilter(initial_values[1], window_length)
+                for i in 2:window_length
                     grow!(mf, initial_values[i])
                 end
-                @assert length(mf) == window_size
+                @assert length(mf) == window_length
                 for i in 1:length(roll_values)
                     roll!(mf, roll_values[i])
                     check_health(mf)
@@ -91,7 +91,7 @@ println("running tests...")
             end
         end
 
-        @testset "Roll does work with window size 1" begin
+        @testset "Roll does work with window length 1" begin
             mf = MedianFilter(1., 1)
             roll!(mf, 2.)
             @test 2. == median(mf)
@@ -224,7 +224,7 @@ println("running tests...")
             @load "fixtures/asymmetric.jld2" fixtures
             for fixture in fixtures
                 mf = MedianFilter(0., min(length(fixture[1]), fixture[2]))
-                output_length = length(fixture[1])+window_size(mf)-1
+                output_length = length(fixture[1])+window_length(mf)-1
                 output = zeros(output_length)
                 @test fixture[3] == running_median!(mf, output, fixture[1], :asym)
             end
@@ -245,16 +245,6 @@ println("running tests...")
     end
 
     @testset "High Level API Tests" begin
-        # Desired API
-        # running_median(input::Array{T, 1}, window_size::Integer, tapering=:sym) where T <: Real
-        # taperings:
-        # :symmetric or :sym (window symmetric around returned point, length N-1 if even window, N if odd)
-        # :asymmetric or :asym (window full length to one side, length length N+W-1 if odd W, N-1+W if even window)
-        # :asymmetric_truncated or :asymtrunc (same as asymmetric, but truncated at ends to size of symmetric)
-        # :none or :no (only full length window used, length N-W+1)
-        # 
-        # all these taperings are symmetrical in that they behave the same at each end of the array, only mirrored
-
         @testset "Basic API examples" begin
             @test_throws ErrorException running_median(zeros(0), 1)
             @test running_median([1.], 1) == [1.]

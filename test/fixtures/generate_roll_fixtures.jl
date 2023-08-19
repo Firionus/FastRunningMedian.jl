@@ -8,7 +8,7 @@ import Statistics
 # ===============================
 
 # format: [(initial_values, roll_values, expected_medians)]
-# window_size == length(initial_values)
+# window_length == length(initial_values)
 # length(roll_values) == length(expected_medians)
 # check each expected_median after pushing the corresponding push_value
 
@@ -28,8 +28,8 @@ function generate_roll_fixture(initial_values, N)
     return (initial_values, roll_values, expected_medians)
 end
 
-function append_roll_fixtures(window_size, push_N)
-    initial_values = rand(window_size)
+function append_roll_fixtures(window_length, push_N)
+    initial_values = rand(window_length)
     push!(roll_fixtures, generate_roll_fixture(initial_values, push_N))
 end
 

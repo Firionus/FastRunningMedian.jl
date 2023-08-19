@@ -27,7 +27,7 @@ Each data point is shown as a cross and the windows are visualized as colored bo
 
 ![Benchmark Comparison](docs/resources/Running%20Median%20Benchmarks.png)
 
-For large window sizes, this package performs even better than calling `runmed` in R, which uses the Turlach implementation written in C. For small window sizes, the Stuetzle implementation in R still outperforms this package, but the overhead from RCall doesn't seem worth it. Development of a fast implementation for small window sizes is ongoing, see the corresponding issues for details. 
+For large window lengths, this package performs even better than calling `runmed` in R, which uses the Turlach implementation written in C. For small window lengths, the Stuetzle implementation in R still outperforms this package, but the overhead from RCall doesn't seem worth it. Development of a fast implementation for small window lengths is ongoing, see the corresponding issues for details. 
 
 In contrast to this package, [SortFilters.jl](https://github.com/sairus7/SortFilters.jl) supports arbitrary probability levels, for example to calculate quantiles.
 
@@ -45,7 +45,7 @@ shrink!
 reset!
 median
 length
-window_size
+window_length
 isfull
 ```
 

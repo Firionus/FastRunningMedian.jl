@@ -1,6 +1,6 @@
 using DataStructures
 
-export MedianFilter, grow!, shrink!, roll!, reset!, isfull, median, length, window_size
+export MedianFilter, grow!, shrink!, roll!, reset!, isfull, median, length, window_length
 
 # Custom Orderings for DataStructures.MutableBinaryHeap
 struct TupleForward <: Base.Ordering end
@@ -40,22 +40,22 @@ mutable struct MedianFilter{T}
 end
 
 """
-    MedianFilter(first_val::T, window_size::Int) where T <: Real
+    MedianFilter(first_val::T, window_length::Int) where T <: Real
 
 Construct a stateful running median filter. 
 
 Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref). 
-Query with [`median`](@ref), [`length`](@ref), [`window_size`](@ref), [`isfull`](@ref). 
+Query with [`median`](@ref), [`length`](@ref), [`window_length`](@ref), [`isfull`](@ref). 
 """
-function MedianFilter(first_val::T, window_size::Int) where {T<:Real}
+function MedianFilter(first_val::T, window_length::Int) where {T<:Real}
     high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
-    high_heap_max_size = window_size ÷ 2
+    high_heap_max_size = window_length ÷ 2
     sizehint!(high_heap, high_heap_max_size)
 
     low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
-    sizehint!(low_heap, window_size - high_heap_max_size)
+    sizehint!(low_heap, window_length - high_heap_max_size)
 
-    heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_size)
+    heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_length)
 
     mf = MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
     # TODO BREAKING return empty median filter without initial value, 
@@ -146,18 +146,18 @@ This number is equal to the length of the internal circular buffer.
 Base.length(mf::MedianFilter) = mf.heap_pos |> length
 
 """
-    window_size(mf::MedianFilter)
+    window_length(mf::MedianFilter)
 
-Returns the window_size of the stateful median filter `mf`. 
+Returns the window_length of the stateful median filter `mf`. 
 
 This number is equal to the capacity of the internal circular buffer. 
 """
-window_size(mf::MedianFilter) = mf.heap_pos |> DataStructures.capacity
+window_length(mf::MedianFilter) = mf.heap_pos |> DataStructures.capacity
 
 """
     isfull(mf::MedianFilter)
 
-Returns true, when the length of the stateful median filter `mf` equals its window\\_size. 
+Returns true when the length of the stateful median filter `mf` equals its window length. 
 """
 isfull(mf::MedianFilter) = mf.heap_pos |> DataStructures.isfull
 
@@ -166,14 +166,14 @@ isfull(mf::MedianFilter) = mf.heap_pos |> DataStructures.isfull
 
 Grow mf with the new value `val`. 
 
-If mf would grow beyond maximum window size, an error is thrown. In this case
+If mf would grow beyond maximum window length, an error is thrown. In this case
 you probably wanted to use [`roll!`](@ref). 
 
 The new element is pushed onto the end of the circular buffer. 
 """
 function grow!(mf::MedianFilter, val)
     # check that we don't grow beyond circular buffer capacity
-    if length(mf) + 1 > window_size(mf)
+    if length(mf) + 1 > window_length(mf)
         error("grow! would grow circular buffer length by 1 and therefore exceed circular buffer capacity")
     end
 
@@ -317,7 +317,7 @@ function roll!(mf::MedianFilter, val)
         return
     end
 
-    new_heap_element = (val, window_size(mf) + mf.heap_pos_offset + 1)
+    new_heap_element = (val, window_length(mf) + mf.heap_pos_offset + 1)
 
     if mf.high_heap |> isempty
         update!(mf.low_heap, to_replace[2], new_heap_element)

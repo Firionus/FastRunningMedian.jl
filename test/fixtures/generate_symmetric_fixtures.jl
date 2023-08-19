@@ -7,7 +7,7 @@ import Statistics
 # Symmetric Fuzz Test Fixtures
 # ========================================
 
-# format: [(values, window_size, expected_medians)]
+# format: [(values, window_length, expected_medians)]
 
 fixtures = Vector{Tuple{Vector{Float64}, Integer, Vector{Float64}}}(undef, 0)
 
@@ -24,10 +24,10 @@ function naive_symmetric_median(arr, window)
     output
 end
 
-function push_fixture(N, window_size)
+function push_fixture(N, window_length)
     values = rand(N)
-    expected_medians = naive_symmetric_median(values, window_size)
-    push!(fixtures, (values, window_size, expected_medians))
+    expected_medians = naive_symmetric_median(values, window_length)
+    push!(fixtures, (values, window_length, expected_medians))
 end
 
 push_fixture(100_000, 101)

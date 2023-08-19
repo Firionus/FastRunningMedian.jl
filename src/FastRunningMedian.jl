@@ -4,14 +4,12 @@ using Base.Iterators: isdone
 
 export running_median, running_median!
 
-# TODO repo-wide, change from window_size to window_length, as it is more in line with Julia conventions
-
 include("stateful_api.jl")
 
 """
-    running_median(input, window_size, tapering=:symmetric; kwargs...) -> output
+    running_median(input, window_length, tapering=:symmetric; kwargs...) -> output
 
-Run a median filter of `window_size` over the input array and return the result. 
+Run a median filter of `window_length` over the input array and return the result. 
 
 ## Taperings
 
@@ -20,17 +18,17 @@ mirror symmetric with respect to the middle of the input array. The available
 taperings are:
 - `:symmteric` or `:sym`: Ensure that the window is symmetric around each point
   of the output array by always growing or shrinking the window by 2. The output
-  has the same length as the input if `window_size` is odd. If `window_size` is
+  has the same length as the input if `window_length` is odd. If `window_length` is
   even, the output has one element less. 
 - `:asymmetric` or `:asym`: Always adds or removes one element when calculating
   the next output value. Creates asymmetric windowing at the edges of the array.
-  If the input is N long, the output is N+window_size-1 elements long. 
+  If the input is N long, the output is N+window_length-1 elements long. 
 - `:asymmetric_truncated` or `:asym_trunc`: The same as asymmetric, but
-  truncated at beginning and end to match the size of `:symmetric`. 
+  truncated at beginning and end to match the length of `:symmetric`. 
 - `:none` or `:no`: No tapering towards the ends. If the input has N elements,
-  the output is only N-window_size+1 long. 
+  the output is only N-window_length+1 long. 
 
-If you choose an even `window_size`, the elements of the output array lie in the
+If you choose an even `window_length`, the elements of the output array lie in the
 middle between the input elements on a continuous underlying axis. 
 
 ## Keyword Arguments
@@ -41,29 +39,29 @@ middle between the input elements on a continuous underlying axis.
   the median will be NaN regardless. 
 - `output_eltype=Float64`: Element type of the output array. The output element
   type should allow converting from Float64 and the input element type. The
-  exception is odd window sizes with taperings `:no` or `:sym`, in which case
+  exception is odd window lengths with taperings `:no` or `:sym`, in which case
   the output element type only has to allow converting from the input element
   type. 
 
 ## Performance
 
-The underlying algorithm should scale as O(N log w) with the input size N and
-the window_size w. 
+The underlying algorithm should scale as O(N log w) with the input length N and
+the window_length w. 
 """
 function running_median(
     input::AbstractVector{T}, 
-    window_size::Integer, 
+    window_length::Integer, 
     tapering=:symmetric;
     nan=:include,
     output_eltype=Float64,
     ) where {T<:Real}
 
-    window_size = _validated_window_size(window_size, length(input), tapering)
+    window_length = _validated_window_length(window_length, length(input), tapering)
     # TODO zero value will later be reset anyway
     # change when an initial value is not required anymore
-    mf = MedianFilter(zero(eltype(input)), window_size)
+    mf = MedianFilter(zero(eltype(input)), window_length)
 
-    output_length = _output_length(length(input), window_size, tapering)
+    output_length = _output_length(length(input), window_length, tapering)
     output = Array{output_eltype,1}(undef, output_length)
 
     _unchecked_running_median!(mf, output, input, tapering, nan)
@@ -77,7 +75,7 @@ Use `mf` to calculate the running median of `input` and write the result to
 
 Compared to [`running_median`](@ref), this function lets you take control of
 allocation for the median filter and the output vector. This is useful when you
-have to calculate many running medians of the same window size (see
+have to calculate many running medians of the same window length (see
 examples below).
 
 For all details, see [`running_median`](@ref).
@@ -111,38 +109,38 @@ function running_median!(
     tapering=:symmetric;
     nan=:include) where {T<:Real,V<:Real}
 
-    winsize = window_size(mf)
-    expected_winsize = _validated_window_size(winsize, length(input), tapering)
-    winsize == expected_winsize || error(
-        "unexpected median filter window size of $winsize instead of $expected_winsize")
+    winlen = window_length(mf)
+    expected_winlen = _validated_window_length(winlen, length(input), tapering)
+    winlen == expected_winlen || error(
+        "unexpected median filter window length of $winlen instead of $expected_winlen")
 
-    expected_output_length = _output_length(length(input), winsize, tapering)
+    expected_output_length = _output_length(length(input), winlen, tapering)
     length(output) == expected_output_length || error(
         "unexpected output length $(length(output)) instead of $expected_output_length")
 
     _unchecked_running_median!(mf, output, input, tapering, nan)
 end
 
-function _validated_window_size(window_size, input_length, tapering)
+function _validated_window_length(window_length, input_length, tapering)
     input_length > 0 || error("input array must be non-empty")
-    window_size >= 1 || error("window_size must be 1 or bigger")
+    window_length >= 1 || error("window_length must be 1 or bigger")
     if tapering in (:symmetric, :sym) && input_length |> iseven
-        window_size = min(window_size, input_length - 1)
+        window_length = min(window_length, input_length - 1)
     else
-        window_size = min(window_size, input_length)
+        window_length = min(window_length, input_length)
     end
-    window_size
+    window_length
 end
 
-function _output_length(input_length, window_size, tapering)
+function _output_length(input_length, window_length, tapering)
     if tapering in (:symmetric, :sym)
-        window_size |> isodd ? input_length : input_length - 1
+        window_length |> isodd ? input_length : input_length - 1
     elseif tapering in (:asymmetric, :asym)
-        input_length + window_size - 1
+        input_length + window_length - 1
     elseif tapering in (:asymmetric_truncated, :asym_trunc)
-        window_size |> isodd ? input_length : input_length - 1
+        window_length |> isodd ? input_length : input_length - 1
     elseif tapering in (:none, :no)
-        input_length - window_size + 1
+        input_length - window_length + 1
     else
         error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
     end
@@ -174,7 +172,7 @@ end
 
 function _symmetric_phases!(init, mf, output, outindit, nan)
     # if even, start with two elements in mf at index 1.5
-    if window_size(mf) |> iseven
+    if window_length(mf) |> iseven
         grow!(mf, popfirst!(init))
     end
 
@@ -227,7 +225,7 @@ end
 
 function _asymmetric_truncated_phases!(init, mf, output, outindit, nan)
     # pre-output grow phase
-    while length(mf) <= window_size(mf) / 2
+    while length(mf) <= window_length(mf) / 2
         grow!(mf, popfirst!(init))
     end
 
