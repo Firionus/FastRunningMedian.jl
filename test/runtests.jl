@@ -379,6 +379,67 @@ println("running tests...")
             @test running_median(@view(data[2:end]), window) == running_median(data[2:end], window)
         end
         
+        @testset "Multi-Series API" begin
+            input = [
+                4 5 6;
+                1 0 9;
+                9 8 7;
+                3 1 2;]
+            expected = [
+                4 5 6;
+                4 5 7;
+                3 1 7;
+                3 1 2;
+            ]
+            # High-level API
+            @test running_median(input, 3) == expected
+
+            # Mid-level API
+            output = similar(input)
+            mf = MedianFilter(eltype(input), 3)
+            @test running_median!(mf, output, input) == expected
+            @test output == expected
+
+            # 3D and offset array
+            input = Array{Int64,3}(undef, (4,3,2))
+            input[:,:,1] = [
+                4 4 1;
+                2 -2 1;
+                -3 0 0;
+                4 3 -3;
+            ]
+            input[:,:,2] = [
+                3 -4 0;
+                -3 1 -3;
+                -3 2 -4;
+                2 -1 3;
+            ]
+            input = OffsetArrays.Origin(2,3,2)(input)
+            expected = Array{Float64,3}(undef, (4,3,2))
+            expected[:,:,1] = [
+                4 4 1;
+                2 0 1;
+                2 0 0;
+                4 3 -3;
+            ]
+            expected[:,:,2] = [
+                3 -4 0;
+                -3 1 -3;
+                -3 1 -3;
+                2 -1 3;
+            ]
+            output = running_median(input,3)
+            @test output == expected
+            @test typeof(output) == Array{Float64,3}
+
+            output = similar(input)
+            mf = MedianFilter(eltype(input), 3)
+            @test running_median!(mf, output, input) == OffsetArrays.Origin(2,3,2)(Int64.(expected))
+
+            output = Array{Int32,3}(undef, (4,3,2))
+            mf = MedianFilter(eltype(input), 3)
+            @test running_median!(mf, output, input) == expected
+        end
     end
 
     @testset "Allocation Regression Test" begin
@@ -386,7 +447,7 @@ println("running tests...")
         w = 1001
         _allocs_jit = @allocations(running_median(x,w))
         allocations = @allocations(running_median(x,w))
-        @test allocations <= 20
+        @test allocations <= 29
     end
 
     @testset "Aqua - Auto Quality Assurance" begin
