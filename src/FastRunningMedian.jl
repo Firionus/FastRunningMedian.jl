@@ -71,11 +71,6 @@ end
 Use `mf` to calculate the running median of `input` and write the result to
 `output`.
 
-Compared to [`running_median`](@ref), this function lets you take control of
-allocation for the median filter and the output vector. This is useful when you
-have to calculate many running medians of the same window length (see
-examples below).
-
 For all details, see [`running_median`](@ref).
 
 # Examples

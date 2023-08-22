@@ -2,21 +2,33 @@
 
 This Julia Package allows you to calculate a running median - fast.
 
-## Installation
+## Getting Started
 
-In Julia, execute:
+In Julia, install with:
 
 ```julia
 ]add FastRunningMedian
 ```
 
-<!--TODO add quick example/doctest, including "using FastRunningMedian"-->
+Example Usage:
+
+```jldoctest
+julia> using FastRunningMedian
+
+julia> running_median([1,9,2,3,-9,1], 3)
+6-element Vector{Float64}:
+ 1.0
+ 2.0
+ 3.0
+ 2.0
+ 1.0
+ 1.0
+```
 
 ## High-level API
 
 ```@docs
 running_median
-running_median!
 ```
 
 ## Taperings Visualized
@@ -35,9 +47,18 @@ In contrast to this package, [SortFilters.jl](https://github.com/sairus7/SortFil
 
 You can find the Notebook used to create the above graph in the `benchmark` folder. I ran it on an i7-2600K with 8 GB RAM while editing and browsing in the background. 
 
+## Mid-level API
+
+You can take control of allocating the output vector and median filter with a lower-level API. This is useful when you
+have to calculate many running medians of the same window length. 
+
+```@docs
+running_median!
+```
+
 ## Stateful API
 
-FastRunningMedian provides a stateful API that can be used for streaming data, e. g. to reduce RAM consumption, or build your own high-level API.
+The stateful API can be used for streaming data, e. g. to reduce RAM consumption, or building your own high-level API.
 
 ```@docs
 MedianFilter

@@ -29,40 +29,28 @@ mutable struct MedianFilter{T}
 
     nans::Int # number of NaN values in heap_pos
 
-    # Inner constructor to enforce T <: Real
-    function MedianFilter(low_heap::MutableBinaryHeap{Tuple{T,Int},TupleReverse},
-        high_heap::MutableBinaryHeap{Tuple{T,Int},TupleForward},
-        heap_pos::CircularBuffer{Tuple{ValueLocation,Int}},
-        heap_pos_offset::Int,
-        nans::Int) where {T<:Real}
-        return new{T}(low_heap, high_heap, heap_pos, heap_pos_offset, nans)
+    function MedianFilter{T}(window_length) where {T<:Real}
+        window_length >= 1 || throw(ArgumentError("window_length must be 1 or bigger"))
+    
+        high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
+        high_heap_max_size = window_length ÷ 2
+        sizehint!(high_heap, high_heap_max_size)
+    
+        low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
+        sizehint!(low_heap, window_length - high_heap_max_size)
+    
+        # TODO once we allow roll! with less than a full window, 
+        # allow constructing with unknown window size and buffer ad-hoc 
+        heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(Int(window_length))
+    
+        return new(low_heap, high_heap, heap_positions, 0, 0)
     end
-end
-
-# TODO move to inner constructor?
-function MedianFilter{T}(window_length) where {T<:Real}
-    window_length >= 1 || throw(ArgumentError("window_length must be 1 or bigger"))
-
-    high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
-    high_heap_max_size = window_length ÷ 2
-    sizehint!(high_heap, high_heap_max_size)
-
-    low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
-    sizehint!(low_heap, window_length - high_heap_max_size)
-
-    # TODO once we allow roll! with less than a full window, 
-    # allow constructing with unknown window size and buffer ad-hoc 
-    heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(Int(window_length))
-
-    return MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
 end
 
 """
     MedianFilter([T=Float64,] window_length) where T <: Real
 
 Construct a stateful running median filter, taking values of type `T`. 
-
-`T` can be omitted to get a `MedianFilter{Float64}`.
 
 Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref), [`reset!`](@ref). 
 Query with [`median`](@ref), [`length`](@ref), [`window_length`](@ref), [`isfull`](@ref). 
