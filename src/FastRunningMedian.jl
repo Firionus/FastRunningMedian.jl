@@ -155,7 +155,7 @@ function _unchecked_running_median!(mf, output, input, tapering, nan)
     input_reshaped = reshape(input, first(size(input)), :)
     output_reshaped = reshape(output, first(size(output)), :)
 
-    for i in axes(input_reshaped)[2]
+    for i in axes(input_reshaped, 2)
         # input iterator
         input_view = @view input_reshaped[:,i]
         init = Iterators.Stateful(input_view)
