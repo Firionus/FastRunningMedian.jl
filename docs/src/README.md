@@ -10,6 +10,8 @@ In Julia, execute:
 ]add FastRunningMedian
 ```
 
+<!--TODO add quick example/doctest, including "using FastRunningMedian"-->
+
 ## High-level API
 
 ```@docs

@@ -40,14 +40,16 @@ mutable struct MedianFilter{T}
 end
 
 """
-    MedianFilter(first_val::T, window_length::Int) where T <: Real
+    MedianFilter{T}(window_length::Int) where T <: Real
 
-Construct a stateful running median filter. 
+Construct a stateful running median filter, taking values of type `T`. 
+
+`T` can be omitted to get a `MedianFilter{Float64}`.
 
 Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref), [`reset!`](@ref). 
 Query with [`median`](@ref), [`length`](@ref), [`window_length`](@ref), [`isfull`](@ref). 
 """
-function MedianFilter(first_val::T, window_length::Int) where {T<:Real}
+function MedianFilter{T}(window_length::Int) where {T<:Real} # TODO default T = Float64?
     high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
     high_heap_max_size = window_length ÷ 2
     sizehint!(high_heap, high_heap_max_size)
@@ -55,30 +57,15 @@ function MedianFilter(first_val::T, window_length::Int) where {T<:Real}
     low_heap = MutableBinaryHeap{Tuple{T,Int},TupleReverse}()
     sizehint!(low_heap, window_length - high_heap_max_size)
 
+    # TODO once we allow roll! with less than a full window, 
+    # allow constructing with unknown window size and resize this with 
+    # ad-hoc allocations
     heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_length)
 
-    mf = MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
-    # TODO BREAKING return empty median filter without initial value, 
-    # let the user grow! whenever they want
-    # this is more flexible and eases our internal code as well
-    reset!(mf, first_val)
+    return MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
 end
 
-"""
-    reset!(mf::MedianFilter, first_value) -> mf
-
-Reset the median filter `mf` by emptying it and initializing with `first_value`.
-"""
-function reset!(mf::MedianFilter, first_value)::MedianFilter
-    _empty_heap!(mf.high_heap)
-    _empty_heap!(mf.low_heap)
-    empty!(mf.heap_pos)
-
-    mf.heap_pos_offset = 0
-    grow!(mf, first_value)
-
-    return mf
-end
+MedianFilter(window_length) = MedianFilter{Float64}(window_length)
 
 # TODO this might move into DataStructures.jl in the future
 # track https://github.com/JuliaCollections/DataStructures.jl/issues/866
@@ -377,5 +364,21 @@ function roll!(mf::MedianFilter, val)::MedianFilter
             mf.heap_pos_offset += 1
         end
     end
+    return mf
+end
+
+"""
+    reset!(mf::MedianFilter, first_value) -> mf
+
+Reset the median filter `mf` by emptying it and initializing with `first_value`.
+"""
+function reset!(mf::MedianFilter, first_value)::MedianFilter
+    _empty_heap!(mf.high_heap)
+    _empty_heap!(mf.low_heap)
+    empty!(mf.heap_pos)
+
+    mf.heap_pos_offset = 0
+    grow!(mf, first_value)
+
     return mf
 end

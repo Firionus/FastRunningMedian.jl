@@ -45,22 +45,21 @@ println("running tests...")
 
             function grow_and_shrink_test(values, expected_medians)
                 N = length(values)
-                mf = MedianFilter(values[1], N)
+                mf = MedianFilter{eltype(values)}(N)
                 check_health(mf)
-                @assert median(mf) == expected_medians[1]
                 #grow phase
-                for i in 2:N
+                for i in 1:N
                     grow!(mf, values[i])
                     check_health(mf)
-                    @assert median(mf) == expected_medians[i]
+                    @test median(mf) == expected_medians[i]
                 end
                 # shrink phase
                 for i in N+1:2N-1
                     shrink!(mf)
                     check_health(mf)
-                    @assert median(mf) == expected_medians[i]
+                    @test median(mf) == expected_medians[i]
                 end
-                @assert length(mf) == 1
+                @test length(mf) == 1
             end
             
             for fixture in grow_shrink_fixtures
@@ -74,15 +73,15 @@ println("running tests...")
 
             function roll_test(initial_values, roll_values, expected_medians)
                 window_length = length(initial_values)
-                mf = MedianFilter(initial_values[1], window_length)
-                for i in 2:window_length
+                mf = MedianFilter{eltype(initial_values)}(window_length)
+                for i in 1:window_length
                     grow!(mf, initial_values[i])
                 end
-                @assert length(mf) == window_length
+                @test length(mf) == window_length
                 for i in 1:length(roll_values)
                     roll!(mf, roll_values[i])
                     check_health(mf)
-                    @assert median(mf) == expected_medians[i]
+                    @test median(mf) == expected_medians[i]
                 end
             end
 
@@ -92,7 +91,9 @@ println("running tests...")
         end
 
         @testset "Roll does work with window length 1" begin
-            mf = MedianFilter(1., 1)
+            mf = MedianFilter{Float64}(1)
+            grow!(mf, 1.)
+            @test 1. == median(mf)
             roll!(mf, 2.)
             @test 2. == median(mf)
             roll!(mf, 1.)
@@ -100,19 +101,21 @@ println("running tests...")
         end
     
         @testset "Grow! does not grow beyond capacity" begin
-            mf = MedianFilter(1., 3)
+            mf = MedianFilter{Float64}(3)
+            grow!(mf, 1.)
             grow!(mf, 2.)
             grow!(mf, 3.)
             @test_throws ErrorException grow!(mf, 4.)
         end
 
         @testset "shrink! below 1-element errors" begin
-            mf = MedianFilter(1., 4)
+            mf = MedianFilter{Float64}(4)
             @test_throws ErrorException shrink!(mf)
         end
 
         @testset "can only roll when capacity is exactly met" begin
-            mf = MedianFilter(1., 3)
+            mf = MedianFilter{Float64}(3)
+            grow!(mf, 1.)
             grow!(mf, 2.)
             @test_throws ErrorException roll!(mf, 3.)
             @test grow!(mf, 3.) == mf
@@ -122,14 +125,18 @@ println("running tests...")
         end
 
         @testset "Including NaN is default and makes whole window NaN" begin
-            mf = MedianFilter(NaN, 2)
+            mf = MedianFilter{Float64}(2)
+            @test median(mf) |> isnan # TODO questionable
+            grow!(mf, NaN)
             @test median(mf) |> isnan
             grow!(mf, 1.)
             @test median(mf) |> isnan
             shrink!(mf)
             @test median(mf) == 1.
 
-            mf = MedianFilter(1., 3)
+            mf = MedianFilter{Float64}(3)
+            grow!(mf, 1.); check_health(mf)
+            @test median(mf) == 1.
             grow!(mf, 2.); check_health(mf)
             @test median(mf) == 1.5
             grow!(mf, NaN); check_health(mf)
@@ -149,7 +156,8 @@ println("running tests...")
             shrink!(mf); check_health(mf)
             @test median(mf) == 6.
 
-            mf = MedianFilter(1., 1)
+            mf = MedianFilter{Float64}(1)
+            grow!(mf, 1.); check_health(mf)
             @test median(mf) == 1.
             roll!(mf, NaN); check_health(mf)
             @test median(mf) |> isnan
@@ -158,14 +166,16 @@ println("running tests...")
         end
 
         @testset "NaN can be ignored in median" begin
-            mf = MedianFilter(NaN, 2)
+            mf = MedianFilter{Float64}(2)
+            grow!(mf, NaN)
             @test median(mf, nan=:ignore) |> isnan
             grow!(mf, 1.); check_health(mf)
             @test median(mf, nan=:ignore) == 1.
             shrink!(mf); check_health(mf)
             @test median(mf) == 1.
 
-            mf = MedianFilter(-1.0, 3)
+            mf = MedianFilter{Float64}(3)
+            grow!(mf, -1.)
             @test median(mf, nan=:ignore) == -1.0
             grow!(mf, NaN); check_health(mf)
             @test median(mf, nan=:ignore) == -1.0
@@ -182,7 +192,8 @@ println("running tests...")
         end
 
         @testset "Pure NaN Input" begin
-            mf = MedianFilter(NaN, 2)
+            mf = MedianFilter{Float64}(2)
+            grow!(mf, NaN)
             @test median(mf) |> isnan
             grow!(mf, NaN); check_health(mf)
             @test median(mf) |> isnan
@@ -191,7 +202,8 @@ println("running tests...")
             shrink!(mf)
             @test median(mf) |> isnan
 
-            mf = MedianFilter(NaN, 3)
+            mf = MedianFilter{Float64}(3)
+            grow!(mf, NaN); check_health(mf)
             grow!(mf, NaN); check_health(mf)
             @test median(mf) |> isnan
             grow!(mf, NaN); check_health(mf)
@@ -209,7 +221,11 @@ println("running tests...")
         end
 
         @testset "Reset Median Filter" begin
-            mf = MedianFilter(1, 2)
+            mf = MedianFilter(2)
+            @test typeof(mf).parameters|>first == Float64
+            # TODO move the tests for MedianFilter in their own test
+            @test grow!(mf, 1) == mf
+            @test median(mf) == 1
             @test grow!(mf, 2) == mf
             @test median(mf) == 1.5
             @test FastRunningMedian.reset!(mf, 3) == mf
@@ -223,7 +239,7 @@ println("running tests...")
         @testset "Compare running_median! to Naive Asymmetric Median" begin
             @load "fixtures/asymmetric.jld2" fixtures
             for fixture in fixtures
-                mf = MedianFilter(0., min(length(fixture[1]), fixture[2]))
+                mf = MedianFilter{Float64}(min(length(fixture[1]), fixture[2]))
                 output_length = length(fixture[1])+window_length(mf)-1
                 output = zeros(output_length)
                 @test fixture[3] == running_median!(mf, output, fixture[1], :asym)
@@ -231,12 +247,12 @@ println("running tests...")
         end
 
         @testset "running_median! with integers" begin
-            mf = MedianFilter(0, 2)
+            mf = MedianFilter{Int}(2)
             input = [1,2,3,4]
             output = [0,0,0]
             @test_throws InexactError running_median!(mf, output, input, :no)
 
-            mf = MedianFilter(0, 3)
+            mf = MedianFilter{Int}(3)
             input = [1,2,3,4]
             output = [0,0]
             running_median!(mf, output, input, :no)

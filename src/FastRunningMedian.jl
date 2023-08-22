@@ -57,9 +57,7 @@ function running_median(
     ) where {T<:Real}
 
     window_length = _validated_window_length(window_length, length(input), tapering)
-    # TODO zero value will later be reset anyway
-    # change when an initial value is not required anymore
-    mf = MedianFilter(zero(eltype(input)), window_length)
+    mf = MedianFilter{eltype(input)}(window_length)
 
     output_length = _output_length(length(input), window_length, tapering)
     output = Array{output_eltype,1}(undef, output_length)
@@ -87,7 +85,7 @@ input = [4 5 6;
          9 8 7;
          3 1 2;]
 output = similar(input, (4,3))
-mf = MedianFilter(42, 3) # first value does not matter
+mf = MedianFilter{eltype(input)}(3)
 for j in axes(input, 2) # run median over each column
     # re-use mf in every iteration
     running_median!(mf, @view(output[:,j]), input[:,j])
