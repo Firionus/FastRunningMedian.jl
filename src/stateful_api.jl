@@ -1,4 +1,4 @@
-using DataStructures
+using DataStructures: DataStructures, MutableBinaryHeap, CircularBuffer, update!, top_with_handle
 
 export MedianFilter, grow!, shrink!, roll!, reset!, isfull, median, length, window_length
 
