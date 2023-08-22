@@ -39,17 +39,10 @@ mutable struct MedianFilter{T}
     end
 end
 
-"""
-    MedianFilter{T}(window_length::Int) where T <: Real
+# TODO move to inner constructor?
+function MedianFilter{T}(window_length) where {T<:Real}
+    window_length >= 1 || throw(ArgumentError("window_length must be 1 or bigger"))
 
-Construct a stateful running median filter, taking values of type `T`. 
-
-`T` can be omitted to get a `MedianFilter{Float64}`.
-
-Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref), [`reset!`](@ref). 
-Query with [`median`](@ref), [`length`](@ref), [`window_length`](@ref), [`isfull`](@ref). 
-"""
-function MedianFilter{T}(window_length::Int) where {T<:Real} # TODO default T = Float64?
     high_heap = MutableBinaryHeap{Tuple{T,Int},TupleForward}()
     high_heap_max_size = window_length ÷ 2
     sizehint!(high_heap, high_heap_max_size)
@@ -58,13 +51,41 @@ function MedianFilter{T}(window_length::Int) where {T<:Real} # TODO default T = 
     sizehint!(low_heap, window_length - high_heap_max_size)
 
     # TODO once we allow roll! with less than a full window, 
-    # allow constructing with unknown window size and resize this with 
-    # ad-hoc allocations
-    heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(window_length)
+    # allow constructing with unknown window size and buffer ad-hoc 
+    heap_positions = CircularBuffer{Tuple{ValueLocation,Int}}(Int(window_length))
 
     return MedianFilter(low_heap, high_heap, heap_positions, 0, 0)
 end
 
+"""
+    MedianFilter([T=Float64,] window_length) where T <: Real
+
+Construct a stateful running median filter, taking values of type `T`. 
+
+`T` can be omitted to get a `MedianFilter{Float64}`.
+
+Manipulate with [`grow!`](@ref), [`roll!`](@ref), [`shrink!`](@ref), [`reset!`](@ref). 
+Query with [`median`](@ref), [`length`](@ref), [`window_length`](@ref), [`isfull`](@ref). 
+
+# Examples
+```jldoctest
+julia> mf = MedianFilter(Int64, 2)
+MedianFilter{Int64}(MutableBinaryHeap(), MutableBinaryHeap(), Tuple{FastRunningMedian.ValueLocation, Int64}[], 0, 0)
+
+julia> grow!(mf, 1); median(mf) # window: [1]
+1
+
+julia> grow!(mf, 2); median(mf) # window: [1,2]
+1.5
+
+julia> roll!(mf, 3); median(mf) # window: [2,3]
+2.5
+
+julia> shrink!(mf); median(mf) # window: [3]
+3
+```
+"""
+MedianFilter(T, window_length) = MedianFilter{T}(window_length)
 MedianFilter(window_length) = MedianFilter{Float64}(window_length)
 
 # TODO this might move into DataStructures.jl in the future

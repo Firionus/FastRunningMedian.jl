@@ -85,7 +85,7 @@ input = [4 5 6;
          9 8 7;
          3 1 2;]
 output = similar(input, (4,3))
-mf = MedianFilter{eltype(input)}(3)
+mf = MedianFilter(eltype(input), 3)
 for j in axes(input, 2) # run median over each column
     # re-use mf in every iteration
     running_median!(mf, @view(output[:,j]), input[:,j])
@@ -109,19 +109,18 @@ function running_median!(
 
     winlen = window_length(mf)
     expected_winlen = _validated_window_length(winlen, length(input), tapering)
-    winlen == expected_winlen || error(
-        "unexpected median filter window length of $winlen instead of $expected_winlen")
+    winlen == expected_winlen || throw(ArgumentError(
+        "unexpected median filter window length of $winlen instead of $expected_winlen"))
 
     expected_output_length = _output_length(length(input), winlen, tapering)
-    length(output) == expected_output_length || error(
-        "unexpected output length $(length(output)) instead of $expected_output_length")
+    length(output) == expected_output_length || throw(ArgumentError(
+        "unexpected output length $(length(output)) instead of $expected_output_length"))
 
     _unchecked_running_median!(mf, output, input, tapering, nan)
 end
 
 function _validated_window_length(window_length, input_length, tapering)
-    input_length > 0 || error("input array must be non-empty")
-    window_length >= 1 || error("window_length must be 1 or bigger")
+    input_length > 0 || throw(ArgumentError("input array must be non-empty"))
     if tapering in (:symmetric, :sym) && input_length |> iseven
         window_length = min(window_length, input_length - 1)
     else
@@ -140,7 +139,7 @@ function _output_length(input_length, window_length, tapering)
     elseif tapering in (:none, :no)
         input_length - window_length + 1
     else
-        error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
+        _throw_invalid_tapering()
     end
 end
 
@@ -162,11 +161,13 @@ function _unchecked_running_median!(mf, output, input, tapering, nan)
     elseif tapering in (:none, :no)
         _untapered_phases!(init, mf, output, outindit, nan)
     else
-        error("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]")
+        _throw_invalid_tapering()
     end
 
     output
 end
+
+_throw_invalid_tapering() = throw(ArgumentError("Invalid tapering. Must be one of [:sym, :asym, :asym_trunc, :no]"))
 
 function _symmetric_phases!(init, mf, output, outindit, nan)
     # if even, start with two elements in mf at index 1.5

@@ -221,9 +221,7 @@ println("running tests...")
         end
 
         @testset "Reset Median Filter" begin
-            mf = MedianFilter(2)
-            @test typeof(mf).parameters|>first == Float64
-            # TODO move the tests for MedianFilter in their own test
+            mf = MedianFilter{Float64}(2)
             @test grow!(mf, 1) == mf
             @test median(mf) == 1
             @test grow!(mf, 2) == mf
@@ -234,6 +232,29 @@ println("running tests...")
             @test grow!(mf, 4) == mf
             check_health(mf)
             @test median(mf) == 3.5
+        end
+
+        @testset "MedianFilter Constructor" begin
+            mf = MedianFilter(3)
+            @test typeof(mf).parameters|>first == Float64
+            @test window_length(mf) == 3
+
+            mf = MedianFilter{Int}(3)
+            @test typeof(mf).parameters|>first == Int
+            @test window_length(mf) == 3
+
+            mf = MedianFilter(Int16, Int16(3))
+            @test typeof(mf).parameters|>first == Int16
+            @test window_length(mf) == 3
+
+            @test_throws ArgumentError MedianFilter(-1)
+            @test_throws MethodError MedianFilter(ComplexF64, 3)
+            
+            # TODO not specifying window_length or value 0 might be possible in 
+            # the future, with flexibly growing buffers
+            @test_throws ArgumentError MedianFilter(0)
+            @test_throws MethodError mf = MedianFilter(Int)
+            @test_throws MethodError mf = MedianFilter()
         end
 
         @testset "Compare running_median! to Naive Asymmetric Median" begin
@@ -262,7 +283,7 @@ println("running tests...")
 
     @testset "High Level API Tests" begin
         @testset "Basic API examples" begin
-            @test_throws ErrorException running_median(zeros(0), 1)
+            @test_throws ArgumentError running_median(zeros(0), 1)
             @test running_median([1.], 1) == [1.]
             @test running_median([1., 2., 3.], 1) == [1., 2., 3.]
             @test running_median([1., 4., 2., 1.], 3) == [1., 2., 2., 1.]
