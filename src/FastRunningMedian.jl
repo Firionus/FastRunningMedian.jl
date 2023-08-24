@@ -163,7 +163,8 @@ function _unchecked_running_median!(mf, output, input, tapering, nan)
         output_view = @view output_reshaped[:,i]
         outindit = Iterators.Stateful(eachindex(output_view))
 
-        reset!(mf, popfirst!(init))
+        reset!(mf)
+        grow!(mf, popfirst!(init))
 
         if tapering in (:symmetric, :sym)
             _symmetric_phases!(init, mf, output_view, outindit, nan)

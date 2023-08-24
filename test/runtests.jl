@@ -226,8 +226,11 @@ println("running tests...")
             @test median(mf) == 1
             @test grow!(mf, 2) == mf
             @test median(mf) == 1.5
-            @test FastRunningMedian.reset!(mf, 3) == mf
+            @test FastRunningMedian.reset!(mf) == mf
             check_health(mf)
+            @test length(mf) == 0
+            @test median(mf) |> isnan
+            grow!(mf, 3); check_health(mf)
             @test median(mf) == 3
             @test grow!(mf, 4) == mf
             check_health(mf)

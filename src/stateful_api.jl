@@ -377,17 +377,16 @@ function roll!(mf::MedianFilter, val)::MedianFilter
 end
 
 """
-    reset!(mf::MedianFilter, first_value) -> mf
+    reset!(mf::MedianFilter) -> mf
 
-Reset the median filter `mf` by emptying it and initializing with `first_value`.
+Reset the median filter `mf` by emptying it.
 """
-function reset!(mf::MedianFilter, first_value)::MedianFilter
+function reset!(mf::MedianFilter)::MedianFilter
     _empty_heap!(mf.high_heap)
     _empty_heap!(mf.low_heap)
     empty!(mf.heap_pos)
 
     mf.heap_pos_offset = 0
-    grow!(mf, first_value)
 
     return mf
 end
