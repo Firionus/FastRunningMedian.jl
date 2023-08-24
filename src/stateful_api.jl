@@ -291,15 +291,8 @@ end
 
 Roll the window over to the next position by replacing the first and oldest
 element in the ciruclar buffer with the new value `val`. 
-
-Will error when `mf` is not full yet - in this case you must first
-[`grow!`](@ref) mf to maximum capacity. 
 """
 function roll!(mf::MedianFilter, val)::MedianFilter
-    if !isfull(mf)
-        error("when rolling, maximum capacity of ring buffer must be met")
-    end
-
     to_replace = mf.heap_pos[1]
 
     if to_replace[1] == nan || val |> isnan
@@ -309,11 +302,11 @@ function roll!(mf::MedianFilter, val)::MedianFilter
         return mf
     end
 
-    new_heap_element = (val, window_length(mf) + mf.heap_pos_offset + 1)
+    new_heap_element = (val, length(mf) + mf.heap_pos_offset + 1)
 
     if mf.high_heap |> isempty
         update!(mf.low_heap, to_replace[2], new_heap_element)
-        push!(mf.heap_pos, to_replace)
+        _circular_push!(mf.heap_pos, to_replace)
         mf.heap_pos_offset += 1
         return mf
     end
@@ -323,7 +316,7 @@ function roll!(mf::MedianFilter, val)::MedianFilter
         if to_replace[1] == lo
             # hole in low_heap
             update!(mf.low_heap, to_replace[2], new_heap_element)
-            push!(mf.heap_pos, to_replace)
+            _circular_push!(mf.heap_pos, to_replace)
             mf.heap_pos_offset += 1
         elseif to_replace[1] == hi
             # hole in high_heap
@@ -334,8 +327,7 @@ function roll!(mf::MedianFilter, val)::MedianFilter
             mf.heap_pos[low_top[2]-mf.heap_pos_offset] = (hi, to_replace[2])
             # put new val where low_top is
             update!(mf.low_heap, low_top_ind, new_heap_element)
-            # perform circular push on circular buffer
-            push!(mf.heap_pos, (lo, low_top_ind))
+            _circular_push!(mf.heap_pos, (lo, low_top_ind))
             mf.heap_pos_offset += 1
         end
     elseif val > first(mf.high_heap)[1]
@@ -349,13 +341,12 @@ function roll!(mf::MedianFilter, val)::MedianFilter
             mf.heap_pos[high_top[2]-mf.heap_pos_offset] = (lo, to_replace[2])
             # put new val where high_top is
             update!(mf.high_heap, high_top_ind, new_heap_element)
-            # perform circular push on circular buffer
-            push!(mf.heap_pos, (hi, high_top_ind))
+            _circular_push!(mf.heap_pos, (hi, high_top_ind))
             mf.heap_pos_offset += 1
         elseif to_replace[1] == hi
             # hole in high_heap
             update!(mf.high_heap, to_replace[2], new_heap_element)
-            push!(mf.heap_pos, to_replace)
+            _circular_push!(mf.heap_pos, to_replace)
             mf.heap_pos_offset += 1
         end
     else
@@ -364,16 +355,21 @@ function roll!(mf::MedianFilter, val)::MedianFilter
         if to_replace[1] == lo
             # hole in low_heap
             update!(mf.low_heap, to_replace[2], new_heap_element)
-            push!(mf.heap_pos, to_replace)
+            _circular_push!(mf.heap_pos, to_replace)
             mf.heap_pos_offset += 1
         elseif to_replace[1] == hi
             # hole in high_heap
             update!(mf.high_heap, to_replace[2], new_heap_element)
-            push!(mf.heap_pos, to_replace)
+            _circular_push!(mf.heap_pos, to_replace)
             mf.heap_pos_offset += 1
         end
     end
     return mf
+end
+
+function _circular_push!(c, e)
+    popfirst!(c)
+    push!(c, e)
 end
 
 """

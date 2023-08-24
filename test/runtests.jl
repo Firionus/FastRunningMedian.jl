@@ -11,6 +11,7 @@ Debug Function for MedianFilter.
 """
 function check_health(mf::MedianFilter)
     nan_count = 0
+    #println(mf)
     for k in 1:length(mf.heap_pos)
         current_heap, current_heap_ind = mf.heap_pos[k]
         if current_heap == lo
@@ -71,13 +72,12 @@ println("running tests...")
             #load test cases
             @load "fixtures/roll.jld2" roll_fixtures
 
-            function roll_test(initial_values, roll_values, expected_medians)
-                window_length = length(initial_values)
+            function roll_test(initial_values, roll_values, expected_medians, window_length = length(initial_values))
                 mf = MedianFilter{eltype(initial_values)}(window_length)
-                for i in 1:window_length
+                for i in eachindex(initial_values)
                     grow!(mf, initial_values[i])
                 end
-                @test length(mf) == window_length
+                @test length(mf) == length(initial_values)
                 for i in 1:length(roll_values)
                     roll!(mf, roll_values[i])
                     check_health(mf)
@@ -87,6 +87,8 @@ println("running tests...")
 
             for fixture in roll_fixtures
                 roll_test(fixture...)
+                roll_test(fixture..., length(fixture[1])+1) # allow roll! with less than full window
+                roll_test(fixture..., length(fixture[1])+2) # allow roll! with less than full window
             end
         end
 
@@ -111,17 +113,6 @@ println("running tests...")
         @testset "shrink! below 1-element errors" begin
             mf = MedianFilter{Float64}(4)
             @test_throws ErrorException shrink!(mf)
-        end
-
-        @testset "can only roll when capacity is exactly met" begin
-            mf = MedianFilter{Float64}(3)
-            grow!(mf, 1.)
-            grow!(mf, 2.)
-            @test_throws ErrorException roll!(mf, 3.)
-            @test grow!(mf, 3.) == mf
-            @test roll!(mf, 4.) == mf
-            @test shrink!(mf) == mf
-            @test_throws ErrorException roll!(mf, 5.)
         end
 
         @testset "Including NaN is default and makes whole window NaN" begin
@@ -458,4 +449,5 @@ println("running tests...")
         Aqua.test_all(FastRunningMedian)
     end
     
+
 end # all tests
