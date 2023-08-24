@@ -31,11 +31,11 @@ taperings are:
   truncated at beginning and end to match the length of `:symmetric`. 
 - `:none` or `:no`: No tapering towards the ends. If the input has N elements,
   the output is only N-window_length+1 long. Equivalent to "roll" from
-  RollingFunctions.
+  [RollingFunctions](https://github.com/JeffreySarnoff/RollingFunctions.jl).
 - `:beginning_only` or `:start`: At the beginning, always grow the window by one
   but do not taper the end. This is equivalent to asymmetric but truncated at
   the end such that the output length matches the input length. Equivalent to
-  "run" from RollingFunctions.
+  "run" from [RollingFunctions](https://github.com/JeffreySarnoff/RollingFunctions.jl).
 
 If you choose an even `window_length`, the elements of the output array lie in
 the middle between the input elements on a continuous underlying axis. 
