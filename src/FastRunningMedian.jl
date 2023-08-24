@@ -18,8 +18,7 @@ first dimension, i.e. over all columns indepedently.
 
 ## Taperings
 
-The tapering decides the behaviour at the ends of the input. All taperings are
-mirror symmetric with respect to the middle of the input array. The available
+The tapering decides the behaviour at the ends of the input. The available
 taperings are:
 - `:symmteric` or `:sym`: Ensure that the window is symmetric around each point
   of the output array by always growing or shrinking the window by 2. The output
@@ -31,10 +30,18 @@ taperings are:
 - `:asymmetric_truncated` or `:asym_trunc`: The same as asymmetric, but
   truncated at beginning and end to match the length of `:symmetric`. 
 - `:none` or `:no`: No tapering towards the ends. If the input has N elements,
-  the output is only N-window_length+1 long. 
+  the output is only N-window_length+1 long. Equivalent to "roll" from
+  RollingFunctions.
+- `:beginning_only` or `:start`: At the beginning, always grow the window by one
+  but do not taper the end. This is equivalent to asymmetric but truncated at
+  the end such that the output length matches the input length. Equivalent to
+  "run" from RollingFunctions.
 
 If you choose an even `window_length`, the elements of the output array lie in
 the middle between the input elements on a continuous underlying axis. 
+
+With the exception of `:beginning_only`, all taperings are mirror symmetric with
+respect to the middle of the input array.
 
 ## Keyword Arguments
 
@@ -145,6 +152,8 @@ function _output_length(input_length, window_length, tapering)
         window_length |> isodd ? input_length : input_length - 1
     elseif tapering in (:none, :no)
         input_length - window_length + 1
+    elseif tapering in (:beginning_only, :start)
+        input_length
     else
         _throw_invalid_tapering()
     end
@@ -174,6 +183,8 @@ function _unchecked_running_median!(mf, output, input, tapering, nan)
             _asymmetric_truncated_phases!(init, mf, output_view, outindit, nan)
         elseif tapering in (:none, :no)
             _untapered_phases!(init, mf, output_view, outindit, nan)
+        elseif tapering in (:beginning_only, :start)
+            _beginning_only_phases!(init, mf, output_view, outindit, nan)
         else
             _throw_invalid_tapering()
         end
@@ -214,7 +225,7 @@ function _symmetric_phases!(init, mf, output, outindit, nan)
     end
 end
 
-function _asymmetric_phases!(init, mf, output, outindit, nan)
+function _beginning_only_phases!(init, mf, output, outindit, nan)
     # first median
     output[popfirst!(outindit)] = median(mf, nan=nan)
 
@@ -229,6 +240,11 @@ function _asymmetric_phases!(init, mf, output, outindit, nan)
         roll!(mf, popfirst!(init))
         output[popfirst!(outindit)] = median(mf, nan=nan)
     end
+end
+
+function _asymmetric_phases!(init, mf, output, outindit, nan)
+
+    _beginning_only_phases!(init, mf, output, outindit, nan)
 
     # shrink phase
     while !isdone(outindit)

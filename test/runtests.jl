@@ -434,6 +434,15 @@ println("running tests...")
             mf = MedianFilter(eltype(input), 3)
             @test running_median!(mf, output, input) == expected
         end
+
+        @testset "Beginning Only Tapering" begin
+            @test running_median([1., 2., 3.], 2, :beginning_only) == [1., 1.5, 2.5]
+            @test running_median([1., 2., 3.], 3, :start) == [1., 1.5, 2.]
+            @test running_median([1., 2., 3.], 4, :start) == [1., 1.5, 2.]
+            @test running_median([1., 4., 2., 1.], 3, :start) == [1., 2.5, 2., 2.]
+            @test running_median([1., 4., 2., 1.], 4, :start) == [1., 2.5, 2., 1.5]
+            @test running_median([1., 4., 2., 1.], 5, :start) == [1., 2.5, 2., 1.5]
+        end
     end
 
     @testset "Allocation Regression Test" begin
