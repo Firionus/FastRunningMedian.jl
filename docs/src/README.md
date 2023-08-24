@@ -35,7 +35,9 @@ running_median
 
 Each data point is shown as a cross and the windows are visualized as colored boxes, the input is grey. 
 
-![Tapering Examples](docs/resources/tapering%20examples.png)
+<p align="center">
+    <img src="docs/resources/tapering%20examples.png" alt="Tapering Examples" width="70%">
+</p>
 
 ## Performance Comparison
 
