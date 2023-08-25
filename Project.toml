@@ -1,7 +1,7 @@
 name = "FastRunningMedian"
 uuid = "3a47ddbd-112b-4cc1-b00e-3746ec434ee5"
 authors = ["Johannes <jcmf.schule@gmail.com>"]
-version = "0.2.1"
+version = "0.3.0"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
