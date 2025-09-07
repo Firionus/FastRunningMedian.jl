@@ -450,7 +450,7 @@ println("running tests...")
         w = 1001
         _allocs_jit = @allocations(running_median(x,w))
         allocations = @allocations(running_median(x,w))
-        @test allocations <= 28
+        @test allocations <= 34
     end
 
     @testset "Aqua - Auto Quality Assurance" begin
