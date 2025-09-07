@@ -76,15 +76,6 @@ julia> shrink!(mf); median(mf) # window: [3]
 MedianFilter(T, window_length) = MedianFilter{T}(window_length)
 MedianFilter(window_length) = MedianFilter{Float64}(window_length)
 
-# TODO this might move into DataStructures.jl in the future
-# track https://github.com/JuliaCollections/DataStructures.jl/issues/866
-function _empty_heap!(heap)
-    while !isempty(heap)
-        pop!(heap)
-    end
-    return heap
-end
-
 """
     median(mf::MedianFilter; nan=:include)
 
@@ -378,8 +369,8 @@ end
 Reset the median filter `mf` by emptying it.
 """
 function reset!(mf::MedianFilter)::MedianFilter
-    _empty_heap!(mf.high_heap)
-    _empty_heap!(mf.low_heap)
+    empty!(mf.high_heap)
+    empty!(mf.low_heap)
     empty!(mf.heap_pos)
 
     mf.heap_pos_offset = 0
